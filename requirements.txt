@@ -1,3 +1,3 @@
-# accessible_pySIde6_Sample — Python 3.9+
+# pyside6-accessible-ui-reference — Python 3.9+
 PySide6>=6.6.0
 psutil>=5.9.0

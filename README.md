@@ -1,8 +1,8 @@
-# accessible_pySIde6_Sample
+# pyside6-accessible-ui-reference
 
 Standalone PySide6 reference application and documentation for screen-reader-friendly desktop UI patterns (JAWS, NVDA, Narrator, Orca).
 
-**Repository:** https://github.com/cfdrakeNS/accessible_pySIde6_Sample
+**Repository:** https://github.com/cfdrakeNS/pyside6-accessible-ui-reference
 
 ## Purpose
 
@@ -17,7 +17,8 @@ This project was extracted from [AbCS](https://github.com/cfdrakeNS/AbCS_Audio_b
 ## Install and run
 
 ```bash
-cd C:\projects\accessible_pySIde6_Sample
+git clone https://github.com/cfdrakeNS/pyside6-accessible-ui-reference.git
+cd pyside6-accessible-ui-reference
 pip install -r requirements.txt
 python main.py
 ```
