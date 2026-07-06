@@ -2,6 +2,8 @@
 
 Standalone PySide6 reference application and documentation for screen-reader-friendly desktop UI patterns (JAWS, NVDA, Narrator, Orca).
 
+**Repository:** https://github.com/cfdrakeNS/accessible_pySIde6_Sample
+
 ## Purpose
 
 - Runnable demo of accessibility patterns documented in `doc/PySide6_*.md`
@@ -10,7 +12,7 @@ Standalone PySide6 reference application and documentation for screen-reader-fri
 
 ## Relationship to AbCS
 
-This project was extracted from [AbCS](https://github.com/cfranke/AbCS) (Audio Book Collector Scanner). AbCS implements these patterns in production under `src/accessibility/` and `src/ui/` but does not bundle this repository.
+This project was extracted from [AbCS](https://github.com/cfdrakeNS/AbCS_Audio_book_Collector_Scanner) (Audio Book Collector Scanner). AbCS implements these patterns in production under `src/accessibility/` and `src/ui/` but does not bundle this repository.
 
 ## Install and run
 
