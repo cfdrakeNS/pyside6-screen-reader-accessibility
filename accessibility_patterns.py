@@ -19,7 +19,7 @@ except ImportError:
     psutil = None
 
 from PySide6.QtCore import QEvent, QSize, Qt, QTimer
-from PySide6.QtGui import QAccessible, QAccessibleEvent, QPalette
+from PySide6.QtGui import QAccessible, QAccessibleEvent, QFontMetricsF, QPalette
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -372,6 +372,45 @@ def create_dialog_html_text(
     widget.document().setDefaultStyleSheet(_DIALOG_HTML_STYLESHEET)
     widget.setHtml(blocks_to_dialog_html(blocks))
     return widget
+
+
+def fit_dialog_width_to_text(
+    dialog: QDialog,
+    text_widget: QTextEdit,
+    *,
+    height: int,
+    max_screen_fraction: float = 0.9,
+) -> None:
+    """Resize dialog so no paragraph in text_widget wraps (section 11).
+
+    JAWS reads each visual line of a wrapped paragraph as you arrow up and
+    down, then rereads the whole paragraph, so wrapped lines are heard twice.
+    Call after the dialog layout is built.
+    """
+    doc = text_widget.document()
+    widest = 0.0
+    block = doc.begin()
+    while block.isValid():
+        fmt = block.blockFormat()
+        line = fmt.leftMargin() + fmt.rightMargin() + fmt.textIndent()
+        it = block.begin()
+        while not it.atEnd():
+            fragment = it.fragment()
+            font = fragment.charFormat().font().resolve(doc.defaultFont())
+            line += QFontMetricsF(font).horizontalAdvance(fragment.text())
+            it += 1
+        widest = max(widest, line)
+        block = block.next()
+    text_width = widest + 2 * doc.documentMargin()
+    margins = dialog.layout().contentsMargins() if dialog.layout() else None
+    chrome = (margins.left() + margins.right()) if margins else 0
+    chrome += 2 * text_widget.frameWidth()
+    chrome += text_widget.style().pixelMetric(QStyle.PixelMetric.PM_ScrollBarExtent)
+    width = int(text_width * 1.05) + chrome + 16
+    screen = dialog.screen() or QApplication.primaryScreen()
+    if screen is not None:
+        width = min(width, int(screen.availableGeometry().width() * max_screen_fraction))
+    dialog.resize(max(width, dialog.minimumWidth()), height)
 
 
 YEAR_PLACEHOLDER = "yyyy"

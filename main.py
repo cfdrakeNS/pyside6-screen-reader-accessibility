@@ -36,6 +36,7 @@ from accessibility_patterns import (
     configure_table,
     create_accessible_read_only_text,
     create_dialog_html_text,
+    fit_dialog_width_to_text,
     init_app_accessibility,
     make_accessible_table_key_press,
     make_year_field,
@@ -54,7 +55,6 @@ class InfoDialog(AccessibleDialog):
     def __init__(self, parent=None):
         super().__init__(parent, title="Sample Info Dialog")
         self.setModal(True)
-        self.resize(480, 420)
         layout = QVBoxLayout(self)
         self.body = create_dialog_html_text(
             self,
@@ -64,18 +64,13 @@ class InfoDialog(AccessibleDialog):
                 ("heading", "WHAT TO CHECK"),
                 ("item", "Insert+T reads Sample Info Dialog, not the window behind it."),
                 ("item", "Up and Down arrows read this text one line at a time."),
-                (
-                    "item",
-                    "Test message box opens a box over this dialog. "
-                    "JAWS should not say Sample Info Dialog unavailable first.",
-                ),
+                ("item", "Test message box opens a box over this dialog."),
+                ("item", "JAWS should not say Sample Info Dialog unavailable first."),
                 ("item", "Tab moves to the Test message box and Close buttons."),
                 ("heading", "HOW THIS TEXT IS BUILT"),
-                (
-                    "body",
-                    "Each heading, line, and list item is its own HTML paragraph "
-                    "in a read-only text box, so the screen reader reads them separately.",
-                ),
+                ("body", "Each heading, line, and list item is its own paragraph."),
+                ("body", "The dialog is sized so no paragraph wraps."),
+                ("body", "JAWS rereads a wrapped line as you arrow up and down."),
             ],
             "Info text",
             "Sample information. Use arrow keys to read line by line. "
@@ -99,6 +94,7 @@ class InfoDialog(AccessibleDialog):
         self.close_button.clicked.connect(self.accept)
         button_layout.addWidget(self.close_button)
         layout.addLayout(button_layout)
+        fit_dialog_width_to_text(self, self.body, height=420)
 
     def showEvent(self, event):
         super().showEvent(event)
