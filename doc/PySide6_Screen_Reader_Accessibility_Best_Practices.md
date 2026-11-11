@@ -20,7 +20,9 @@ Every major action must be reachable by keyboard.
 Always define meaningful names and descriptions for important controls, groups, and dialogs.
 - Name: what this control is.
 - Description: what this control does or how to use it.
+- Keep names and descriptions on dialogs too; do not clear them to reduce speech.
 - `QAction` menu items are named by their menu text; do not set an accessible name on them.
+- An image that carries information takes focus and has a spoken name; a decorative image does not take focus.
 
 ## 4. Status changes must be announced
 
@@ -28,6 +30,7 @@ Do not rely only on `QStatusBar.showMessage()`.
 - Announce meaningful changes, such as save, delete, or a validation failure.
 - Provide explicit re-read support (for example `Alt+/`).
 - Never announce from a hidden window. The announcement lands on the window behind it, and the screen reader reads that window's title instead (principle 23).
+- Keep shortcut hints out of status messages. Put them in accessible descriptions and the F1 list. The exception is "Press Escape to cancel" during a long operation.
 
 ## 5. Errors should be foregrounded
 
@@ -45,8 +48,11 @@ Prefer enabled actions with clear error feedback over silent disabled controls w
 ## 7. Avoid global Enter/Return shortcut conflicts
 
 Do not bind global Enter/Return shortcuts that override normal button activation.
-- Let focused buttons and the default button use native Enter behavior.
+- In a dialog with one clear main action, make it the default button so Enter runs it.
+- In a form with several buttons, turn the default off on every button and let Enter click the button that has focus.
 - Scope key handling to specific widgets or contexts.
+
+See implementation reference section 5.
 
 ## 8. Make static text reviewable line by line
 
@@ -56,6 +62,7 @@ For shortcut help:
 
 For About, License, Setup, and info text:
 - Use a read-only text area, not a `QLabel`. Give it a short accessible name; put the content in the document, not the name.
+- Short instructions (1 to 3 sentences) are the exception: a focusable label may carry its whole text as its name, so it is read at once.
 - Make each heading, line, and list item its own paragraph.
 - Do not let paragraphs wrap. JAWS reads each wrapped line as you arrow, then rereads the whole paragraph. Keep sentences short and size the dialog to fit the longest one.
 - Remove empty lines, which can make JAWS repeat the previous line.
@@ -112,8 +119,9 @@ Documentation model:
 ## 14. Detect screen readers before speech-only behavior
 
 Do not assume every user wants spoken status updates.
-- Detect running screen readers when possible before focus-brief announcements.
-- Combine `QAccessible.isActive()` with process detection for reliability.
+- `QAccessible.isActive()` alone is not a screen reader test; Magnifier and the touch keyboard also turn it on.
+- Change the interface (typed fields, hidden visual content) only when a screen reader process is running.
+- Allow announcements when either check is true, so speech still works with an unknown reader.
 - Use per-reader timing when restoring focus after status readback.
 
 See implementation reference section 14.
@@ -174,6 +182,7 @@ Selection state should be available in status or accessible text, not only visua
 - While the user arrows through a table or list, let the cell's accessible text speak. Do not also announce through the status bar.
 - Announce after explicit selection actions, such as multi-select ("3 selected").
 - Keep the status text current so Alt+/ can read it.
+- Exception: when Up/Down changes a focused value field (a year or date), speak the new value.
 
 See implementation reference section 21.
 
@@ -189,7 +198,7 @@ See implementation reference section 22.
 
 When a window opens, the screen reader should speak only that window.
 - Set starting values in the constructor, before the window is shown.
-- Set first focus after the window is shown.
+- Set first focus after the window is shown, not in the constructor.
 - Announce nothing while the window is hidden.
 - When a menu item opens a window, keep focus off the window behind it until the new window is shown.
 
@@ -206,7 +215,7 @@ See implementation reference section 25.
 ## 25. Keep the interface responsive and stable during background work
 
 - Show and focus a progress window before disabling the controls that started the work.
-- When background work finishes, bring the window forward and focus its default button before announcing.
+- When background work finishes, bring the window forward and focus its main button before announcing.
 - Never update widgets from a worker thread.
 
 See implementation reference section 28.

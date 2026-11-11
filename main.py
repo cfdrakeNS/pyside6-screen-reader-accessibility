@@ -250,6 +250,12 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
         button_layout.addStretch()
         tab_layout.addLayout(button_layout)
 
+        # A form with several buttons: no default button; Enter clicks the
+        # focused button (keyPressEvent), so Enter in a field fires nothing.
+        for button in (self.save_button, self.delete_button, self.info_button):
+            button.setAutoDefault(False)
+            button.setDefault(False)
+
         self.setTabOrder(self.title_edit, self.category_combo)
         self.setTabOrder(self.category_combo, self.year_field)
         self.setTabOrder(self.year_field, self.items_table)
@@ -295,13 +301,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
             return
         name_item = self.items_table.item(row, 0)
         label = name_item.text() if name_item else f"Row {row + 1}"
-        announce_selection(
-            self.status_bar,
-            label,
-            count=1,
-            hint="Ctrl+S save, Alt+D delete",
-            announce=False,
-        )
+        announce_selection(self.status_bar, label, count=1, announce=False)
 
     def on_save(self):
         title = self.title_edit.text().strip()
@@ -348,6 +348,15 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
         announce_dialog_closed(dlg)
         self.set_status("Info dialog closed")
         self.info_button.setFocus()
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            focused = self.focusWidget()
+            if isinstance(focused, QPushButton) and focused.isEnabled():
+                focused.click()
+                event.accept()
+                return
+        super().keyPressEvent(event)
 
     def setup_shortcuts(self):
         for seq, handler in (

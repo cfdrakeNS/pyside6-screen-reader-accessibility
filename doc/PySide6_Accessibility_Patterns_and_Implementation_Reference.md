@@ -23,6 +23,7 @@ Pattern:
 - Announce only while the window is visible. `set_status` ignores `announce=True` when `self.isVisible()` is false (section 23).
 - Keep a default status message for explicit readback, and support **Alt+/** to re-read the current status (`read_status_bar_message`).
 - Announce only meaningful state changes, such as save, delete, or a validation failure. Do not announce on every arrow key (section 21).
+- Keep shortcut hints out of status messages ("Saved", not "Saved. Press Ctrl+S to save again"). Hints belong in accessible descriptions and the F1 list. The one exception is "Press Escape to cancel" while a long operation runs.
 - When focus is restored after the announcement, `announce_status_message` uses the application focus widget, or the window's own focus widget if the window is not active yet (section 24).
 
 Reference: `accessibility_patterns.py` (`announce_status_message`, `read_status_bar_message`, `AccessibilityMixin.set_status`), `main.py` (`AccessibleSampleWindow.on_save`, `on_delete`).
@@ -46,10 +47,10 @@ Goal: avoid stray Alt+letter input leaking into text fields.
 
 Pattern:
 - Define a per-window allowlist of Alt+letter actions (`ALLOWED_ALT_KEYS`).
-- Consume unmapped Alt+letter and Alt+digit events in event filters, with a beep.
+- Consume unmapped Alt+letter and Alt+digit events in event filters, and always beep. Beep from one shared place (here `AccessibilityMixin.eventFilter`), not in each window, so every window gives the same feedback. `is_unmapped_alt_letter` only answers the question; it does not beep.
 - Keep `Alt+/` available in major windows.
 
-Reference: `accessibility_patterns.py` (`is_unmapped_alt_letter`), `main.py` (`AccessibleSampleWindow.ALLOWED_ALT_KEYS`).
+Reference: `accessibility_patterns.py` (`is_unmapped_alt_letter`, `AccessibilityMixin.eventFilter`), `main.py` (`AccessibleSampleWindow.ALLOWED_ALT_KEYS`).
 
 ## 4. AccessibleDialog window title pattern (JAWS Insert+T)
 
@@ -98,11 +99,29 @@ Goal: make warnings, confirmations, and feature dialogs readable and actionable.
 Pattern:
 - Use `AccessibleDialog` for custom modal dialogs (section 4), not raw `QDialog(parent)`.
 - Use the shared message box helper for prompts (section 18).
-- Set clear dialog titles, text, and explicit button labels. Set accessible names and descriptions on the dialog and every control.
-- Make the primary action the default button (`setDefault(True)`) and make sure Tab reaches it.
+- Set clear dialog titles, text, and explicit button labels. Set accessible names and descriptions on the dialog and every control. Do not clear the dialog's name or description to reduce speech.
 - Return focus to the most relevant control after the dialog closes (section 24).
 
-Reference: `styled_dialogs.py`, `main.py` (`InfoDialog`, `AccessibleSampleWindow.on_open_info_dialog`).
+### Default button and Enter
+
+Choose one rule per window:
+- **One clear main action** (a confirmation, an info dialog with Close or OK): make it the default button with `setDefault(True)`, and make sure Tab reaches it. Enter anywhere in the dialog runs it.
+- **A form with several buttons** (Save, Delete, Browse, and so on): turn `setAutoDefault(False)` and `setDefault(False)` off on every button, and make Enter click the button that has focus. Otherwise Enter in a text field fires whichever button Qt picks, and Enter on a focused button with auto-default off does nothing.
+
+```python
+def keyPressEvent(self, event):
+    if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+        focused = self.focusWidget()
+        if isinstance(focused, QPushButton) and focused.isEnabled():
+            focused.click()
+            event.accept()
+            return
+    super().keyPressEvent(event)
+```
+
+Never bind a global Enter shortcut (section 6).
+
+Reference: `styled_dialogs.py`, `main.py` (`InfoDialog` uses a default Close button; `AccessibleSampleWindow` is a form and uses Enter-clicks-focused).
 
 ## 6. Keyboard shortcut implementation pattern
 
@@ -267,9 +286,10 @@ Both helpers apply the same keyboard review settings (`configure_navigable_text_
 
 ### Rules
 
-- **Never** put the full body text in `setAccessibleName()`. Use a short name and a description that mentions arrow-key review.
-- One sentence per block; no paragraph may wrap at the dialog's width.
-- Decorative graphics (for example a splash image) use `Qt.NoFocus`.
+- Do not put body text in `setAccessibleName()`. Use a short name and a description that mentions arrow-key review.
+- **Exception: short instructions.** A focusable instruction label of 1 to 3 sentences may carry its whole text as its accessible name, so the screen reader reads it at once when Tab reaches it. Do not set text interaction flags on it (that switches Qt to line-by-line text reading). Anything longer uses line review.
+- One sentence per block; no paragraph may wrap at the dialog's width. A help viewer whose text cannot fit may wrap, but still keeps one sentence per paragraph.
+- Decorative graphics (for example a splash image) use `Qt.NoFocus`. An image that carries information (for example a cover that may be missing) takes focus and has a spoken name such as "Book cover" or "No cover".
 - Set initial focus to the text area in `showEvent` with `QTimer.singleShot(0, ...)`.
 
 Reference: `accessibility_patterns.py` (`create_dialog_html_text`, `blocks_to_dialog_html`, `fit_dialog_width_to_text`, `create_accessible_read_only_text`, `configure_navigable_text_edit`), `main.py` (`InfoDialog`, `_build_text_tab`).
@@ -332,7 +352,9 @@ Goal: gate speech-only behavior when a screen reader is likely active.
 Pattern:
 - Scan running processes for known screen reader executables (JAWS, NVDA, Narrator, Orca).
 - Use `psutil` when available; treat missing `psutil` as "no reader detected."
-- Combine process detection with `QAccessible.isActive()` before announcing status or opening readback paths.
+- `QAccessible.isActive()` is not a screen reader test. On Windows it turns on for any UI Automation client, including Magnifier and the touch keyboard. Use the two checks this way:
+  - **Changing the interface** (a typed field instead of a spin box, hiding visual-only content): process detection only (`is_screen_reader_active()`).
+  - **Announcements** (status focus pulse, Alt+/ readback): `QAccessible.isActive()` or process detection, so speech still works with a reader the process list does not know.
 - Use per-reader focus-restore delays when briefly moving focus to the status bar (JAWS 300 ms, NVDA 1500 ms, Narrator 3500 ms, Orca 800 ms).
 - Detection can also choose a control: the year field is a typed text box when a screen reader is running (section 25).
 
@@ -434,6 +456,8 @@ Pattern:
 - Announce with `announce=True` only after an explicit selection action, such as Space or Shift+arrow multi-select, or an action like "3 selected".
 - Put semantic row/cell text in `Qt.AccessibleTextRole`, not only in display text.
 
+**Exception: stepped values.** When Up/Down changes the value of a focused field (a year spin box, a date), announce the new value ("Year 2024"). The field's own value change is often not spoken, and the user needs to hear the result of each step. This applies to value fields only, never to moving through a table or list.
+
 **AbCS production.** The AbCS main window calls `announce_selection()` only from explicit selection actions, and keeps the "selected" suffix in each cell's `AccessibleTextRole` (`BookTableModel.set_selection_book_ids`).
 
 Reference: `accessibility_patterns.py` (`announce_selection`), `main.py` (`AccessibleSampleWindow._on_table_selection_changed`).
@@ -463,7 +487,7 @@ A status announcement made while a window is still hidden moves focus to a statu
 - Never announce while the window is hidden. `AccessibilityMixin.set_status` ignores `announce=True` when `isVisible()` is false. Call sites in production code may pass `announce=self.isVisible()` explicitly.
 - If an opening message must be spoken, keep it and announce it after `showEvent`.
 - Emit `DialogStart` from `showEvent` (section 16).
-- Set first focus in `showEvent` with `QTimer.singleShot(0, ...)`. `AccessibleDialog` then re-fires focus after its delay (section 4).
+- Set first focus in `showEvent` with `QTimer.singleShot(0, ...)`, never in the constructor and never with a longer timer started from `__init__`. A timer started in `__init__` can fire after a fast close and focus a deleted widget. `AccessibleDialog` then re-fires focus after its delay (section 4).
 - Guard one-time work with a flag, because `showEvent` runs again when a minimized window is restored.
 
 ```python
@@ -545,7 +569,7 @@ This demo has no menu bar. **AbCS production:** `_hold_focus_for_menu_action` in
 
 Principles from AbCS background work (import, web fetch, Calibre):
 - **Opening a progress window:** show, raise, activate, and focus the progress window **before** disabling the caller's buttons. Disabling the focused button first moves focus to the next control, for example an instructions label, and the screen reader reads it.
-- **Modal completion after background work:** `raise_()`, `activateWindow()`, and focus on the **default button** before announcing.
+- **Modal completion after background work:** `raise_()`, `activateWindow()`, and focus on the **default button** (or the main action button) before announcing.
 - **Worker threads must not touch widgets.** Send progress and UI updates through a GUI-thread `QObject` bridge, connected with `Qt.QueuedConnection` to `@Slot` methods. Plain Python callables are not enough.
 
 This demo has no background work.
