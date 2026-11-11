@@ -6,11 +6,32 @@ Demonstrates AccessibleDialog (Insert+T root window) and message box helpers.
 
 import sys
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, qVersion
 from PySide6.QtGui import QFont
-from PySide6.QtWidgets import QDialog, QMessageBox
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QDialog,
+    QHeaderView,
+    QMessageBox,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+)
 
 from accessibility_patterns import exec_styled_message_box
+
+
+def _focus_refire_delay_ms() -> int:
+    """Return the focus-refire delay suited to the running Qt version.
+
+    Qt 6.11 improved MSAA/UIA top-level window and focus registration on
+    Windows, so 100 ms is enough there. Older Qt builds need 300 ms.
+    """
+    try:
+        major, minor = (int(x) for x in qVersion().split(".")[:2])
+    except Exception:
+        return 300
+    return 100 if (major, minor) >= (6, 11) else 300
 
 
 def _set_win32_owner(child_hwnd: int, owner_hwnd: int) -> None:
@@ -53,7 +74,7 @@ class AccessibleDialog(QDialog):
     def showEvent(self, event):
         super().showEvent(event)
         if getattr(self, "_announce_focus_on_show", True):
-            QTimer.singleShot(300, self._refire_focus_for_screen_reader)
+            QTimer.singleShot(_focus_refire_delay_ms(), self._refire_focus_for_screen_reader)
 
     def _refire_focus_for_screen_reader(self):
         if not self.isVisible():
@@ -75,6 +96,48 @@ class StyledDialog(AccessibleDialog):
     def __init__(self, parent=None, title: str = "Dialog"):
         super().__init__(parent, title=title)
         self.setModal(True)
+
+
+def exec_shortcuts_dialog(parent, title: str, shortcuts) -> int:
+    """F1 help: one-column read-only shortcut table in an AccessibleDialog (section 7).
+
+    ``shortcuts`` is a sequence of ``(key, action)`` pairs. Escape closes the dialog.
+    """
+    dlg = AccessibleDialog(parent, title=title)
+    dlg.setAccessibleName("Keyboard Shortcuts")
+    dlg.setModal(True)
+    dlg.resize(420, 320)
+
+    layout = QVBoxLayout(dlg)
+    layout.setContentsMargins(20, 20, 20, 20)
+
+    table = QTableWidget(len(shortcuts), 1, dlg)
+    table.setAccessibleName("Shortcuts list")
+    table.setHorizontalHeaderLabels([""])
+    table.setVerticalHeaderLabels([""] * len(shortcuts))
+    table.verticalHeader().setVisible(False)
+    table.horizontalHeader().setVisible(False)
+    table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+    table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+    table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
+    table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+    table.setTabKeyNavigation(False)
+    table.setShowGrid(False)
+    table.setMouseTracking(False)
+    table.viewport().setMouseTracking(False)
+    table.setAttribute(Qt.WidgetAttribute.WA_Hover, False)
+    table.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover, False)
+
+    for row, (key, action) in enumerate(shortcuts):
+        item = QTableWidgetItem(f"{action} - {key}")
+        item.setData(Qt.ItemDataRole.AccessibleTextRole, f"{action}: {key}")
+        table.setItem(row, 0, item)
+    if shortcuts:
+        table.setCurrentCell(0, 0)
+
+    layout.addWidget(table)
+    table.setFocus(Qt.FocusReason.OtherFocusReason)
+    return dlg.exec()
 
 
 def show_styled_message_box(

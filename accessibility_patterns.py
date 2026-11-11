@@ -468,7 +468,14 @@ def exec_styled_message_box(
     button_accessibility: dict | None = None,
 ) -> int:
     """Accessible styled message box (section 18)."""
-    msg = QMessageBox(parent)
+    from styled_dialogs import AccessibleDialog, _set_win32_owner
+
+    owner = parent.window() if parent is not None else None
+    # A modal box disables the window behind it, and JAWS then reads an
+    # AccessibleDialog as "<title> unavailable" before the box. Owning the box
+    # natively (no Qt parent, window modal) keeps the dialog enabled.
+    keep_owner_enabled = isinstance(owner, AccessibleDialog) and owner.isVisible()
+    msg = QMessageBox(None if keep_owner_enabled else parent)
     msg.setIcon(icon)
     msg.setWindowTitle(title)
     msg.setText(text)
@@ -485,6 +492,13 @@ def exec_styled_message_box(
                 button.setAccessibleName(name)
                 if desc:
                     button.setAccessibleDescription(desc)
+    if keep_owner_enabled:
+        msg.setWindowModality(Qt.WindowModality.WindowModal)
+        _set_win32_owner(int(msg.winId()), int(owner.winId()))
+        msg.adjustSize()
+        frame = msg.frameGeometry()
+        frame.moveCenter(owner.frameGeometry().center())
+        msg.move(frame.topLeft())
     return msg.exec()
 
 
@@ -542,13 +556,18 @@ class AccessibilityMixin:
         return self._screen_reader
 
     def set_status(self, message: str, announce: bool = False) -> None:
+        """Update the status bar; announce only while the window is visible.
+
+        A focus pulse from a hidden window lands on the window behind it, and
+        the screen reader reads that window's title instead of the message.
+        """
         if not hasattr(self, "status_bar"):
             return
         self._default_status = message
         announce_status_message(
             self.status_bar,
             message,
-            move_focus=announce,
+            move_focus=announce and self.isVisible(),
             update_visible=True,
         )
 

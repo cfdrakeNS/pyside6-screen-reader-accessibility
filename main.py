@@ -5,7 +5,7 @@ Demonstrates accessibility patterns documented in doc/PySide6_*.md
 
 import sys
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -38,7 +38,7 @@ from accessibility_patterns import (
     init_app_accessibility,
     make_accessible_table_key_press,
 )
-from styled_dialogs import AccessibleDialog, show_styled_message_box
+from styled_dialogs import AccessibleDialog, exec_shortcuts_dialog, show_styled_message_box
 
 _CONTEXT_HELP = {
     "main": "Main sample window. Use F1 for shortcuts or Shift+F1 for this context help.",
@@ -52,23 +52,51 @@ class InfoDialog(AccessibleDialog):
         super().__init__(parent, title="Sample Info Dialog")
         self.setModal(True)
         layout = QVBoxLayout(self)
-        body = create_accessible_read_only_text(
+        self.body = create_accessible_read_only_text(
             self,
             "This dialog is an accessibility root window.\n"
             "JAWS Insert+T should read Sample Info Dialog, not the parent window.\n"
+            "Test message box opens a box over this dialog. "
+            "JAWS should not say Sample Info Dialog unavailable before it.\n"
             "Use arrow keys to review this text line by line.",
             "Info text",
             "Sample information. Use arrow keys to read line by line.",
         )
-        layout.addWidget(body)
-        close_btn = QPushButton("Close")
-        close_btn.setAccessibleName("Close button")
-        close_btn.clicked.connect(self.accept)
-        layout.addWidget(close_btn, alignment=Qt.AlignmentFlag.AlignRight)
-        QApplication.instance().processEvents()
-        from PySide6.QtCore import QTimer
+        layout.addWidget(self.body)
 
-        QTimer.singleShot(100, lambda: body.setFocus(Qt.FocusReason.TabFocusReason))
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        self.test_button = QPushButton("Test message box")
+        self.test_button.setAccessibleName("Test message box button")
+        self.test_button.setAccessibleDescription(
+            "Show a message box over this dialog to check that the dialog is not read as unavailable"
+        )
+        self.test_button.clicked.connect(self.on_test_message_box)
+        button_layout.addWidget(self.test_button)
+
+        self.close_button = QPushButton("Close")
+        self.close_button.setAccessibleName("Close button")
+        self.close_button.setDefault(True)
+        self.close_button.clicked.connect(self.accept)
+        button_layout.addWidget(self.close_button)
+        layout.addLayout(button_layout)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        announce_dialog_opened(self, self.windowTitle())
+        QTimer.singleShot(0, lambda: self.body.setFocus(Qt.FocusReason.TabFocusReason))
+
+    def on_test_message_box(self):
+        show_styled_message_box(
+            self,
+            icon=QMessageBox.Icon.Information,
+            title="Message Over Dialog",
+            text="This box is owned by Sample Info Dialog, which stays enabled behind it.",
+            button_accessibility={
+                QMessageBox.StandardButton.Ok: ("OK", "Close this message and return to the dialog"),
+            },
+        )
+        self.test_button.setFocus()
 
 
 class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
@@ -105,7 +133,15 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
             self.set_status("Ready - all accessibility patterns active")
 
         self.setup_shortcuts()
-        announce_dialog_opened(self, window_title)
+        self._shown_once = False
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if self._shown_once:
+            return
+        self._shown_once = True
+        announce_dialog_opened(self, self._window_title)
+        QTimer.singleShot(0, lambda: self.title_edit.setFocus(Qt.FocusReason.OtherFocusReason))
 
     def _build_form_tab(self):
         tab = QWidget()
@@ -239,7 +275,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
             self.status_bar,
             label,
             count=1,
-            hint="Alt+S save, Alt+D delete",
+            hint="Ctrl+S save, Alt+D delete",
             announce=True,
         )
 
@@ -281,7 +317,6 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
 
     def on_open_info_dialog(self):
         dlg = InfoDialog(self)
-        announce_dialog_opened(dlg, dlg.windowTitle())
         dlg.exec()
         announce_dialog_closed(dlg)
         self.set_status("Info dialog closed")
@@ -293,6 +328,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
             ("Escape", self.on_escape),
             ("Alt+/", self.read_status),
             ("Shift+F1", self.on_context_help),
+            ("Ctrl+S", self.on_save),
             ("Alt+T", lambda: self.title_edit.setFocus()),
             ("Alt+C", lambda: self.category_combo.setFocus()),
             ("Alt+Y", lambda: self.year_spin.setFocus()),
@@ -317,22 +353,25 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
         )
 
     def on_show_shortcuts(self):
-        help_text = (
-            "ACCESSIBLE SAMPLE - documented patterns\n\n"
-            "F1 - this help\n"
-            "Shift+F1 - context help\n"
-            "Alt+/ - read status\n"
-            "Escape - close with confirmation\n\n"
-            "Patterns: status bar, combo anti-noise, Alt-key hygiene, "
-            "AccessibleDialog, dialog events, read-only text, PlotLineList, "
-            "table semantics, tab-exits-table, selection announce, tooltips, "
-            "styled message boxes, focus restore."
-        )
-        show_styled_message_box(
+        exec_shortcuts_dialog(
             self,
-            icon=QMessageBox.Icon.Information,
-            title="Accessibility Patterns",
-            text=help_text,
+            "Keyboard Shortcuts - Accessible Sample",
+            [
+                ("F1", "Show this help"),
+                ("Shift+F1", "Context help"),
+                ("Alt+/", "Read status"),
+                ("Ctrl+S", "Save"),
+                ("Alt+T", "Title field"),
+                ("Alt+C", "Category field"),
+                ("Alt+Y", "Year field"),
+                ("Alt+I or Alt+L", "Items table"),
+                ("Alt+S", "Save button"),
+                ("Alt+D", "Delete button"),
+                ("Alt+O", "Open info dialog"),
+                ("Alt+P", "Plot list"),
+                ("Alt+Down", "Open category list"),
+                ("Escape", "Close window with confirmation"),
+            ],
         )
 
     def on_escape(self):
