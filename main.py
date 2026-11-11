@@ -4,6 +4,7 @@ Demonstrates accessibility patterns documented in doc/PySide6_*.md
 """
 
 import sys
+from datetime import datetime
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
@@ -16,7 +17,6 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QSpinBox,
     QStatusBar,
     QTableWidget,
     QTableWidgetItem,
@@ -35,8 +35,11 @@ from accessibility_patterns import (
     apply_tooltip_accessibility,
     configure_table,
     create_accessible_read_only_text,
+    create_dialog_html_text,
     init_app_accessibility,
     make_accessible_table_key_press,
+    make_year_field,
+    validate_year_field,
 )
 from styled_dialogs import AccessibleDialog, exec_shortcuts_dialog, show_styled_message_box
 
@@ -51,18 +54,34 @@ class InfoDialog(AccessibleDialog):
     def __init__(self, parent=None):
         super().__init__(parent, title="Sample Info Dialog")
         self.setModal(True)
+        self.resize(480, 420)
         layout = QVBoxLayout(self)
-        self.body = create_accessible_read_only_text(
+        self.body = create_dialog_html_text(
             self,
-            "This dialog is an accessibility root window.\n"
-            "JAWS Insert+T should read Sample Info Dialog, not the parent window.\n"
-            "Test message box opens a box over this dialog. "
-            "JAWS should not say Sample Info Dialog unavailable before it.\n"
-            "Use arrow keys to review this text line by line.",
+            [
+                ("body", "Sample Info Dialog - accessibility patterns demo"),
+                ("body", "This dialog is an accessibility root window."),
+                ("heading", "WHAT TO CHECK"),
+                ("item", "Insert+T reads Sample Info Dialog, not the window behind it."),
+                ("item", "Up and Down arrows read this text one line at a time."),
+                (
+                    "item",
+                    "Test message box opens a box over this dialog. "
+                    "JAWS should not say Sample Info Dialog unavailable first.",
+                ),
+                ("item", "Tab moves to the Test message box and Close buttons."),
+                ("heading", "HOW THIS TEXT IS BUILT"),
+                (
+                    "body",
+                    "Each heading, line, and list item is its own HTML paragraph "
+                    "in a read-only text box, so the screen reader reads them separately.",
+                ),
+            ],
             "Info text",
-            "Sample information. Use arrow keys to read line by line.",
+            "Sample information. Use arrow keys to read line by line. "
+            "Press Tab to move to the buttons.",
         )
-        layout.addWidget(self.body)
+        layout.addWidget(self.body, stretch=1)
 
         button_layout = QHBoxLayout()
         button_layout.addStretch()
@@ -165,12 +184,11 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
         form.addRow(category_label, self.category_combo)
 
         year_label = QLabel("&Year:")
-        self.year_spin = QSpinBox()
-        self.year_spin.setRange(1900, 2030)
-        self.year_spin.setValue(2026)
-        self.year_spin.setAccessibleName("Year field")
-        year_label.setBuddy(self.year_spin)
-        form.addRow(year_label, self.year_spin)
+        self.year_field = make_year_field(self)
+        self.year_field.setValue(datetime.now().year)
+        self.year_field.setAccessibleName("Year field")
+        year_label.setBuddy(self.year_field)
+        form.addRow(year_label, self.year_field)
 
         tab_layout.addLayout(form)
 
@@ -230,8 +248,8 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
         tab_layout.addLayout(button_layout)
 
         self.setTabOrder(self.title_edit, self.category_combo)
-        self.setTabOrder(self.category_combo, self.year_spin)
-        self.setTabOrder(self.year_spin, self.items_table)
+        self.setTabOrder(self.category_combo, self.year_field)
+        self.setTabOrder(self.year_field, self.items_table)
         self.setTabOrder(self.items_table, self.save_button)
         self.setTabOrder(self.save_button, self.delete_button)
         self.setTabOrder(self.delete_button, self.info_button)
@@ -294,6 +312,9 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
             self.title_edit.setFocus()
             self.set_status("Save canceled: title is required", announce=True)
             return
+        if not validate_year_field(self.year_field, self):
+            self.set_status("Save canceled: year is not valid", announce=True)
+            return
         self.set_status("Data saved successfully", announce=True)
         self.title_edit.setFocus()
 
@@ -331,7 +352,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
             ("Ctrl+S", self.on_save),
             ("Alt+T", lambda: self.title_edit.setFocus()),
             ("Alt+C", lambda: self.category_combo.setFocus()),
-            ("Alt+Y", lambda: self.year_spin.setFocus()),
+            ("Alt+Y", lambda: self.year_field.setFocus()),
             ("Alt+I", lambda: self.items_table.setFocus()),
             ("Alt+L", lambda: self.items_table.setFocus()),
             ("Alt+S", lambda: self.save_button.setFocus()),

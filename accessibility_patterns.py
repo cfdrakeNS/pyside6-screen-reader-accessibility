@@ -7,9 +7,11 @@ See doc/PySide6_Accessibility_Patterns_and_Implementation_Reference.md.
 
 from __future__ import annotations
 
+import html as html_module
 import re
 import time
 from collections.abc import Iterable
+from datetime import datetime
 
 try:
     import psutil
@@ -178,7 +180,9 @@ def announce_status_message(
         app = QApplication.instance()
         if not app:
             return
-        previous_focus = app.focusWidget()
+        # Right after a message box closes, the owner may not be active yet, so
+        # the app has no focus widget; the window still remembers its own.
+        previous_focus = app.focusWidget() or status_bar.window().focusWidget()
         status_bar.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         status_bar.setFocus(Qt.FocusReason.OtherFocusReason)
         QApplication.processEvents()
@@ -303,6 +307,188 @@ def create_accessible_read_only_text(
         accessible_description=accessible_description,
         transparent_background=transparent_background,
     )
+
+
+def configure_navigable_text_edit(widget: QTextEdit | QPlainTextEdit) -> QTextEdit | QPlainTextEdit:
+    """Enable arrow-key line review on editable or read-only text fields."""
+    widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+    widget.setTabChangesFocus(True)
+    widget.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByKeyboard)
+    widget.setMouseTracking(False)
+    widget.viewport().setMouseTracking(False)
+    widget.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover, False)
+    return widget
+
+
+_DIALOG_HTML_STYLESHEET = """
+p.body { margin-top: 0.1em; margin-bottom: 0.1em; }
+p.heading { font-weight: bold; margin-top: 0.35em; margin-bottom: 0.08em; }
+p.item { margin-left: 1.25em; margin-top: 0.06em; margin-bottom: 0.06em; }
+"""
+
+
+def blocks_to_dialog_html(blocks: list[tuple[str, str]]) -> str:
+    """Convert ``(kind, text)`` blocks to HTML paragraphs; kind is body, heading, or item."""
+    parts: list[str] = []
+    for kind, text in blocks:
+        cleaned = text.strip()
+        if not cleaned:
+            continue
+        escaped = html_module.escape(cleaned)
+        if kind == "heading":
+            parts.append(f'<p class="heading"><strong>{escaped}</strong></p>')
+        elif kind == "item":
+            parts.append(f'<p class="item">{escaped}</p>')
+        else:
+            parts.append(f'<p class="body">{escaped}</p>')
+    return "<html><body>\n" + "\n".join(parts) + "\n</body></html>"
+
+
+def create_dialog_html_text(
+    parent,
+    blocks: list[tuple[str, str]],
+    accessible_name: str,
+    accessible_description: str,
+    *,
+    transparent_background: bool = True,
+) -> QTextEdit:
+    """Dialog prose as HTML paragraphs for JAWS/NVDA line-by-line review (section 11).
+
+    Use for About, Info, License, and Setup dialog bodies. Each block is one
+    paragraph, so the screen reader reads each heading, body line, and list item
+    on its own as the user arrows through the text.
+    """
+    widget = QTextEdit(parent)
+    widget.setReadOnly(True)
+    widget.setFrameShape(QFrame.Shape.NoFrame)
+    widget.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+    widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+    widget.setAccessibleName(accessible_name)
+    widget.setAccessibleDescription(accessible_description)
+    if transparent_background:
+        widget.setStyleSheet("QTextEdit { background: transparent; border: none; }")
+    configure_navigable_text_edit(widget)
+    widget.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+    widget.document().setDefaultStyleSheet(_DIALOG_HTML_STYLESHEET)
+    widget.setHtml(blocks_to_dialog_html(blocks))
+    return widget
+
+
+YEAR_PLACEHOLDER = "yyyy"
+DEFAULT_MIN_YEAR = 1801
+
+
+def default_year_range() -> tuple[int, int]:
+    """Return (min_year, max_year): 1801 through the current year."""
+    return DEFAULT_MIN_YEAR, datetime.now().year
+
+
+def parse_year_text(text: str, *, min_year: int, max_year: int) -> int | None:
+    """Return the year, None when blank, or raise ValueError when invalid."""
+    raw = (text or "").strip()
+    if not raw:
+        return None
+    if not raw.isdigit() or len(raw) != 4:
+        raise ValueError("incomplete")
+    year = int(raw)
+    if year < min_year or year > max_year:
+        raise ValueError("invalid")
+    return year
+
+
+def year_invalid_message(entered: str, *, min_year: int, max_year: int) -> str:
+    shown = (entered or "").strip() or "(blank)"
+    return (
+        f"Year '{shown}' is not valid. "
+        f"Enter a year from {min_year} to {max_year}, or leave blank."
+    )
+
+
+class MaskedYearEdit(QLineEdit):
+    """Typed four-digit year for screen reader users. Blank means no year.
+
+    A QSpinBox announces every Up/Down step and can change the value silently;
+    a plain text field reads the typed digits back reliably in JAWS and NVDA.
+    """
+
+    def __init__(self, parent=None, *, min_year: int, max_year: int):
+        super().__init__(parent)
+        self._min_year = min_year
+        self._max_year = max_year
+        self.setPlaceholderText(YEAR_PLACEHOLDER)
+        self.setMaxLength(4)
+        self.setMaximumWidth(110)
+        self.setClearButtonEnabled(False)
+        self.setAccessibleDescription(
+            f"Type a four digit year from {min_year} to {max_year}, "
+            "or leave blank. Invalid values show a message when you save."
+        )
+
+    def focusInEvent(self, event):
+        super().focusInEvent(event)
+        QTimer.singleShot(0, self._place_cursor_for_typing)
+
+    def _place_cursor_for_typing(self) -> None:
+        if not self.hasFocus():
+            return
+        self.deselect()
+        self.setCursorPosition(0)
+
+    def setValue(self, value: int | None) -> None:
+        self.setText(f"{int(value):04d}" if value else "")
+
+    def value(self) -> int | None:
+        try:
+            return self.validated_year()
+        except ValueError:
+            return None
+
+    def validated_year(self) -> int | None:
+        return parse_year_text(self.text(), min_year=self._min_year, max_year=self._max_year)
+
+    def invalid_message(self) -> str:
+        return year_invalid_message(
+            self.text(), min_year=self._min_year, max_year=self._max_year
+        )
+
+
+def make_year_field(parent=None, *, min_year: int | None = None, max_year: int | None = None):
+    """Year field: typed MaskedYearEdit when a screen reader is active, else QSpinBox.
+
+    Both support ``setValue()`` and ``value()``. Check the field with
+    ``validate_year_field()`` before saving.
+    """
+    default_min, default_max = default_year_range()
+    min_year = default_min if min_year is None else min_year
+    max_year = default_max if max_year is None else max_year
+    if is_screen_reader_active():
+        return MaskedYearEdit(parent, min_year=min_year, max_year=max_year)
+    spin = QSpinBox(parent)
+    spin.setRange(min_year, max_year)
+    spin.setMaximumWidth(110)
+    spin.setAccessibleDescription(
+        f"Year from {min_year} to {max_year}. Use Up and Down arrows or type a year."
+    )
+    return spin
+
+
+def validate_year_field(field, parent) -> bool:
+    """Return True when the year is valid; otherwise beep, warn, and focus the field."""
+    if not isinstance(field, MaskedYearEdit):
+        return True
+    try:
+        field.validated_year()
+        return True
+    except ValueError:
+        QApplication.beep()
+        exec_styled_message_box(
+            parent,
+            icon=QMessageBox.Icon.Warning,
+            title="Invalid Entry",
+            text=field.invalid_message(),
+        )
+        field.setFocus()
+        return False
 
 
 def _wrap_at_words(text: str, width: int = _PLOT_LINE_WIDTH) -> list[str]:
@@ -499,7 +685,13 @@ def exec_styled_message_box(
         frame = msg.frameGeometry()
         frame.moveCenter(owner.frameGeometry().center())
         msg.move(frame.topLeft())
-    return msg.exec()
+    result = msg.exec()
+    if keep_owner_enabled and owner.isVisible():
+        # Without a Qt parent, Qt does not reactivate the owner when the box
+        # closes; the caller's setFocus() would land in an inactive window.
+        owner.raise_()
+        owner.activateWindow()
+    return result
 
 
 def _combo_box_for_event_source(source) -> QComboBox | None:
