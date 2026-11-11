@@ -9,6 +9,7 @@ from datetime import datetime
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QApplication,
     QComboBox,
     QFormLayout,
@@ -19,7 +20,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QStatusBar,
     QTableWidget,
-    QTableWidgetItem,
     QTabWidget,
     QTextEdit,
     QVBoxLayout,
@@ -40,6 +40,7 @@ from accessibility_patterns import (
     init_app_accessibility,
     make_accessible_table_key_press,
     make_year_field,
+    set_accessible_table_rows,
     validate_year_field,
 )
 from styled_dialogs import AccessibleDialog, exec_shortcuts_dialog, show_styled_message_box
@@ -194,19 +195,20 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
         tab_layout.addLayout(form)
 
         table_label = QLabel("Items:")
-        self.items_table = QTableWidget(3, 2)
+        self.items_table = QTableWidget(0, 2)
         self.items_table.setHorizontalHeaderLabels(["Name", "Value"])
-        self.items_table.setItem(0, 0, QTableWidgetItem("Item 1"))
-        self.items_table.item(0, 0).setData(Qt.ItemDataRole.AccessibleTextRole, "First item name")
-        self.items_table.setItem(0, 1, QTableWidgetItem("100"))
-        self.items_table.item(0, 1).setData(
-            Qt.ItemDataRole.AccessibleTextRole, "First item value: 100"
+        set_accessible_table_rows(
+            self.items_table,
+            [("Item 1", "100"), ("Item 2", "200"), ("Item 3", "300")],
         )
-        self.items_table.setItem(1, 0, QTableWidgetItem("Item 2"))
-        self.items_table.item(1, 0).setData(Qt.ItemDataRole.AccessibleTextRole, "Second item name")
-        self.items_table.setItem(1, 1, QTableWidgetItem("200"))
         self.items_table.setAccessibleName("Items table")
-        self.items_table.setAccessibleDescription("Table showing item names and values")
+        self.items_table.setAccessibleDescription(
+            "Table showing item names and values. Each row reads the name and value together."
+        )
+        self.items_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.items_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.items_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.items_table.setTabKeyNavigation(False)
         configure_table(self.items_table)
         self.items_table.keyPressEvent = make_accessible_table_key_press(self.items_table, self)
         self.items_table.itemSelectionChanged.connect(self._on_table_selection_changed)
@@ -285,6 +287,9 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
         self.tabs.addTab(tab, "Text Review")
 
     def _on_table_selection_changed(self):
+        # Status text only: a focus-pulse announce on every arrow key pulls
+        # focus out of the table, and JAWS re-enters it reading coordinates.
+        # The cell's AccessibleTextRole already speaks the row; Alt+/ reads this.
         row = self.items_table.currentRow()
         if row < 0:
             return
@@ -295,7 +300,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
             label,
             count=1,
             hint="Ctrl+S save, Alt+D delete",
-            announce=True,
+            announce=False,
         )
 
     def on_save(self):

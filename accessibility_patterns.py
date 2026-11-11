@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
     QStyledItemDelegate,
     QStyleOptionViewItem,
     QTableWidget,
+    QTableWidgetItem,
     QTextEdit,
     QWidget,
 )
@@ -659,8 +660,22 @@ def keep_selection_visible_when_inactive(widget: QWidget) -> None:
 
 
 def configure_table(table: QTableWidget) -> None:
-    """Hide row headers, reduce hover noise, and make selection easy to see (section 9)."""
-    table.verticalHeader().setVisible(False)
+    """Silence row headers, reduce hover noise, and make selection easy to see (section 9).
+
+    Hiding the vertical header is not enough: JAWS still reads row numbers
+    and cell coordinates unless the header is also disabled, unfocusable,
+    and labeled empty. Pair with ``set_accessible_table_rows()`` so every
+    cell has spoken text.
+    """
+    vh = table.verticalHeader()
+    vh.setVisible(False)
+    vh.setAccessibleName("Table Row Headers")
+    vh.setAccessibleDescription("Table row headers are hidden.")
+    vh.setHighlightSections(False)
+    vh.setSectionsClickable(False)
+    vh.setSectionsMovable(False)
+    vh.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+    vh.setEnabled(False)
     row_count = table.rowCount()
     if row_count:
         table.setVerticalHeaderLabels([""] * row_count)
@@ -670,6 +685,26 @@ def configure_table(table: QTableWidget) -> None:
     table.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover, False)
     table.setStyleSheet(build_accessible_table_style())
     keep_selection_visible_when_inactive(table)
+
+
+def set_accessible_table_rows(table: QTableWidget, rows) -> None:
+    """Fill a label/value table so every cell speaks ``"label: value"`` (section 9).
+
+    ``rows`` is a sequence of ``(label, value)`` pairs. Both cells in a row get
+    the same AccessibleTextRole, so arrowing to either cell reads the label and
+    value together. No cell is left empty; an empty cell makes JAWS read
+    coordinates instead of content.
+    """
+    rows = list(rows)
+    table.setRowCount(len(rows))
+    table.setVerticalHeaderLabels([""] * len(rows))
+    for row, (label, value) in enumerate(rows):
+        spoken = f"{label}: {value}" if label else str(value)
+        for column, text in enumerate((label, str(value))):
+            item = QTableWidgetItem(text)
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            item.setData(Qt.ItemDataRole.AccessibleTextRole, spoken)
+            table.setItem(row, column, item)
 
 
 def make_accessible_table_key_press(table: QTableWidget, parent: QWidget):
