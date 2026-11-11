@@ -14,7 +14,12 @@ Formerly `pyside6-accessible-ui-reference`. Old GitHub links redirect here.
 
 ## Relationship to AbCS
 
-This project was extracted from [AbCS](https://github.com/cfdrakeNS/AbCS_Audio_book_Collector_Scanner) (Audio Book Collector Scanner). AbCS implements these patterns in production under `src/accessibility/` and `src/ui/` but does not bundle this repository.
+This project was extracted from [AbCS](https://github.com/cfdrakeNS/AbCS_Audiobook_Collector_Scanner) (Audiobook Collector Scanner). AbCS implements these patterns in production under `src/accessibility/` and `src/ui/` but does not bundle this repository.
+
+- [AbCS accessibility standard](https://github.com/cfdrakeNS/AbCS_Audiobook_Collector_Scanner/blob/main/doc/standards/accessibility_ui_standards.md) — the rules AbCS follows for every UI change
+- [AbCS Standards Crosswalk](doc/AbCS_Standards_Crosswalk.md) — maps each AbCS rule to a section of the implementation reference and to the demo code
+
+AbCS adds infrastructure this demo leaves out: UI scaling (`UIScaler`), styled buttons (`build_accessible_button_style`), icons, a help router, and menus. You do not need them to adopt the patterns here.
 
 ## Install and run
 
@@ -33,41 +38,60 @@ python main.py
 |------|------|
 | `main.py` | Demo window (`AccessibleSampleWindow`, `InfoDialog`) |
 | `accessibility_patterns.py` | `AccessibilityMixin` and helper functions |
-| `styled_dialogs.py` | `AccessibleDialog` and styled message boxes |
-| `doc/PySide6_Accessibility_Patterns_and_Implementation_Reference.md` | Code patterns |
+| `styled_dialogs.py` | `AccessibleDialog`, F1 shortcut dialog, and styled message boxes |
+| `doc/PySide6_Accessibility_Patterns_and_Implementation_Reference.md` | Code patterns (section numbers below) |
 | `doc/PySide6_Screen_Reader_Accessibility_Best_Practices.md` | Design principles |
+| `doc/AbCS_Standards_Crosswalk.md` | AbCS standard rule to section and demo code |
 
 ## Patterns demonstrated
 
-| # | Pattern | Location |
+| § | Pattern | Location |
 |---|---------|----------|
-| 1 | Status bar + Alt+/ readback | `accessibility_patterns.py`, `main.py` |
-| 2 | Combo anti-noise | `AccessibilityMixin.eventFilter` |
-| 3 | Alt+letter hygiene | `AccessibilityMixin.eventFilter` |
-| 4 | AccessibleDialog (Insert+T) | `styled_dialogs.py`, `InfoDialog` |
-| 5 | Modal dialog accessibility | `show_styled_message_box`, `InfoDialog` |
-| 6 | Keyboard shortcuts | `main.py` |
-| 7 | F1 / Shift+F1 help | `main.py` |
+| 1 | Status bar announce and Alt+/ readback | `announce_status_message`, `AccessibilityMixin.set_status` |
+| 2 | Editable combo anti-noise | `AccessibilityMixin.eventFilter` |
+| 3 | Alt+letter hygiene | `is_unmapped_alt_letter` |
+| 4 | AccessibleDialog (Insert+T reads the right title) | `styled_dialogs.AccessibleDialog` |
+| 6 | Local F1, Escape, Alt+/ shortcuts; Ctrl+S Save | `AccessibleSampleWindow.setup_shortcuts` |
+| 7 | F1 help as a one-column table dialog | `exec_shortcuts_dialog` |
 | 8 | Focus safety (deselect on FocusIn) | `AccessibilityMixin.focus_deselect` |
-| 9 | Table semantics | `configure_table`, `main.py` |
-| 11 | Read-only navigable text | `create_accessible_read_only_text` |
+| 9 | Tables read "name: value", not coordinates; visible selection | `set_accessible_table_rows`, `configure_table` |
+| 11 | Dialog text read line by line, with no wrapped lines | `create_dialog_html_text`, `fit_dialog_width_to_text` |
 | 12 | Plot line-by-line review | `PlotLineList` |
-| 14–22 | SR detection, QAccessible init, dialog events, tooltips, message boxes, selection announce, tab-exits-table | `accessibility_patterns.py`, `main.py` |
+| 16 | Dialog open and close events | `announce_dialog_opened`, `announce_dialog_closed` |
+| 17 | Tooltips separate from descriptions | `apply_tooltip_accessibility` |
+| 18 | Message box over a dialog without "unavailable" | `exec_styled_message_box`; `InfoDialog` Test message box |
+| 21 | No status announce while arrowing a table | `_on_table_selection_changed` |
+| 22 | Tab exits the table | `make_accessible_table_key_press` |
+| 23 | Window open: first focus in `showEvent`, no announce while hidden | `AccessibleSampleWindow.showEvent` |
+| 24 | Focus returns to the field after a message box | `exec_styled_message_box`, `announce_status_message` |
+| 25 | Typed year field when a screen reader is running | `make_year_field`, `validate_year_field` |
+
+Sections 14 and 15 (screen reader detection, QAccessible startup) are in `accessibility_patterns.py`. Sections 26–28 describe AbCS production patterns the demo does not include.
 
 ## Shortcuts
 
-- **F1** — pattern help
+- **F1** — keyboard shortcuts
 - **Shift+F1** — context help stub
 - **Alt+/** — read status
+- **Ctrl+S** — save
 - **Escape** — close with confirmation
-- **Alt+T/C/Y/I/L/S/D/O/P** — focus fields, buttons, plot list, info dialog
+- **Alt+T/C/Y** — Title, Category, Year fields
+- **Alt+I** or **Alt+L** — Items table
+- **Alt+S/D** — Save and Delete buttons
+- **Alt+O** — open the info dialog
+- **Alt+P** — plot list
+- **Alt+Down** — open the category list
+
+## Validation
+
+Before changing a pattern, run the manual JAWS/NVDA check in implementation reference section 29: names on Tab, keyboard-only actions, Alt+/, focus after each dialog and message box, Insert+T titles, no "unavailable" before a box, tables read content, and dialog text read once per line.
 
 ## Using as a reference
 
 1. Copy `accessibility_patterns.py` and `styled_dialogs.py` into your project
 2. Inherit **`AccessibilityMixin` before `QDialog` subclasses** (see implementation reference §2 and §4)
 3. Call `init_app_accessibility(app)` in `main()`
-4. Follow `doc/PySide6_*.md`
+4. Follow `doc/PySide6_*.md`, and run the section 29 check after each UI change
 
 ## License
 

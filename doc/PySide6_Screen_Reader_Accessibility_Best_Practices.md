@@ -1,12 +1,12 @@
 # PySide6 Screen Reader Accessibility Best Practices
 
-This document is a principles-first reference for designing accessible PySide6 interfaces. Runnable examples live in this repository (`main.py` and helper modules).
+This document is a principles-first reference for designing accessible PySide6 interfaces. Code patterns are in [PySide6_Accessibility_Patterns_and_Implementation_Reference.md](PySide6_Accessibility_Patterns_and_Implementation_Reference.md) (the implementation reference), and runnable examples are in this repository (`main.py` and helper modules). The mapping to the AbCS standards is in [AbCS_Standards_Crosswalk.md](AbCS_Standards_Crosswalk.md).
 
 ## 1. Never rely on visuals alone
 
 If text matters, expose it through accessible widgets and metadata.
-- Use `QLabel` for display-only text where possible.
-- Use read-only input widgets only when interaction semantics are required.
+- Use `QLabel` for short display-only text.
+- Use read-only text widgets when the user must review the text line by line (principle 8).
 
 ## 2. Keyboard-first navigation is mandatory
 
@@ -17,21 +17,24 @@ Every major action must be reachable by keyboard.
 
 ## 3. Accessible names and descriptions are required
 
-Always define meaningful names/descriptions for important controls, groups, and dialogs.
+Always define meaningful names and descriptions for important controls, groups, and dialogs.
 - Name: what this control is.
 - Description: what this control does or how to use it.
+- `QAction` menu items are named by their menu text; do not set an accessible name on them.
 
 ## 4. Status changes must be announced
 
 Do not rely only on `QStatusBar.showMessage()`.
-- Mirror status updates to accessibility metadata.
+- Announce meaningful changes, such as save, delete, or a validation failure.
 - Provide explicit re-read support (for example `Alt+/`).
+- Never announce from a hidden window. The announcement lands on the window behind it, and the screen reader reads that window's title instead (principle 23).
 
 ## 5. Errors should be foregrounded
 
 When validation fails:
-- Use an accessible modal dialog or focused inline error.
-- Move focus to the next corrective action.
+- Use an accessible message box or a focused inline error.
+- Include the text the user entered in the message, and keep it in the field so it can be corrected.
+- Move focus to the control that needs correcting.
 
 ## 6. Keep action discoverability high
 
@@ -42,48 +45,55 @@ Prefer enabled actions with clear error feedback over silent disabled controls w
 ## 7. Avoid global Enter/Return shortcut conflicts
 
 Do not bind global Enter/Return shortcuts that override normal button activation.
-- Let focused buttons use native Enter behavior.
+- Let focused buttons and the default button use native Enter behavior.
 - Scope key handling to specific widgets or contexts.
 
-## 8. Use screen reader-friendly help dialogs
+## 8. Make static text reviewable line by line
 
-For shortcut help and static guidance:
-- Use simple list/table structures.
-- Keep wording short and explicit.
-- Ensure each row has meaningful accessible text.
+For shortcut help:
+- Use a simple one-column list or table in its own dialog.
+- Keep wording short and explicit, with meaningful accessible text on each row.
 
-For long static body text (About, License, Setup):
-- Use read-only `QTextEdit` via `create_accessible_read_only_text()` — not `QLabel`.
-- Set a short accessible name; put content in the document, not the name.
-- Enable `TextSelectableByKeyboard` so arrow keys move line by line.
-- Collapse empty lines in source text to avoid JAWS repeating the previous line.
+For About, License, Setup, and info text:
+- Use a read-only text area, not a `QLabel`. Give it a short accessible name; put the content in the document, not the name.
+- Make each heading, line, and list item its own paragraph.
+- Do not let paragraphs wrap. JAWS reads each wrapped line as you arrow, then rereads the whole paragraph. Keep sentences short and size the dialog to fit the longest one.
+- Remove empty lines, which can make JAWS repeat the previous line.
 
-For long plot text in view mode:
-- Use `PlotLineList` (one list row per review line; rating on row 0).
-- Keep continuous prose in the database and in edit-mode `QTextEdit`.
+For long prose in view mode (for example a book plot):
+- Use one list row per review line, with the rating on its own first row.
+- Keep continuous prose in storage and in the edit field.
 
-See implementation reference sections 11–12.
+See implementation reference sections 7, 11, and 12.
 
-## 9. Reduce table announcement noise
+## 9. Tables must read content, not coordinates
 
-Where row numbers do not help:
-- Hide vertical row headers.
-- Provide semantic `AccessibleTextRole` values for meaningful cells.
+- Give every cell spoken text, and leave no cell empty. An empty cell or a cell without accessible text makes JAWS read its coordinates.
+- In a label/value table, make each cell speak "label: value", so either cell reads the whole row.
+- Silence row headers completely. Hiding them is not enough; also disable them and label them empty.
+- Make the selection easy to see: a solid highlight that stays visible when the table loses focus.
+- Do not announce on every arrow key (principle 21).
+
+See implementation reference section 9.
 
 ## 10. Treat focus management as part of accessibility
 
-After save/delete/import/cancel operations:
+After save, delete, import, cancel, or any dialog or message box:
 - Restore focus intentionally.
 - Keep users in a predictable workflow position.
+
+See implementation reference section 24.
 
 ## 11. Dialog windows must be accessibility roots (Insert+T)
 
 When a dialog opens, screen readers must identify **that dialog** as the current window, not the window behind it.
 
-- Do not use `QDialog(parent=mainWindow)` for feature dialogs — Qt exposes that as an accessibility child of the parent, so JAWS Insert+T reads the parent's title.
-- Use `AccessibleDialog` (`styled_dialogs.py` (`AccessibleDialog`)): logical `parent` is passed for Win32 ownership/z-order, but the Qt parent is `None` so the dialog is a root in the MSAA/UIA tree.
-- Verify with JAWS Insert+T after opening each major window and after F1 help popups.
-- Exception: modeless utility windows with special z-order needs (for example `ImportProgressWindow`) may remain standard `QDialog` with a Qt parent when `AccessibleDialog` would break scan/cancel behavior.
+- Do not use `QDialog(parent=mainWindow)` for feature dialogs. Qt exposes it as an accessibility child of the parent, so JAWS Insert+T reads the parent's title.
+- Use `AccessibleDialog` (`styled_dialogs.py`). The logical parent is used for Win32 ownership and z-order, but the Qt parent is `None`, so the dialog is a root in the MSAA/UIA tree.
+- Verify with JAWS Insert+T after opening each major window and each F1 help popup.
+- Exception: modeless utility windows with special z-order needs (for example AbCS `ImportProgressWindow`) may stay a standard `QDialog` with a Qt parent when `AccessibleDialog` would break their behavior.
+
+See implementation reference section 4.
 
 ## 12. Test with more than one screen reader
 
@@ -91,11 +101,13 @@ Use at least two screen readers in validation when possible.
 - Different engines expose different accessibility gaps.
 - Cross-checking catches regressions earlier.
 
+See principle 26 for the checklist.
+
 ## 13. Keep implementation and principles separate
 
 Documentation model:
 - Principles live in this best-practices document.
-- Concrete implementation patterns and code references live in the implementation reference document.
+- Concrete implementation patterns and code references live in the implementation reference.
 
 ## 14. Detect screen readers before speech-only behavior
 
@@ -117,7 +129,8 @@ See implementation reference section 15.
 ## 16. Announce dialog open and close events
 
 Screen reader users benefit from explicit dialog boundaries.
-- Emit dialog start/end accessibility events when feature dialogs open and close.
+- Emit dialog start and end accessibility events when feature dialogs open and close.
+- Emit the start event once the dialog is shown, not before.
 - Keep dialog titles short and accurate for Insert+T verification.
 
 See implementation reference section 16.
@@ -132,8 +145,9 @@ See implementation reference section 17.
 
 ## 18. Use accessible message boxes for errors and confirmations
 
-Validation and confirmation dialogs must be readable and actionable.
-- Prefer a shared styled message box helper with explicit button labels.
+Validation and confirmation boxes must be readable and actionable.
+- Use a shared styled message box helper with explicit, named buttons.
+- A message box over a dialog must not disable that dialog. Otherwise JAWS says "<title> unavailable" before reading the box.
 - Return focus to the field or control that needs correction after errors.
 
 See implementation reference section 18.
@@ -154,11 +168,12 @@ Help should be discoverable and navigable by keyboard.
 
 See implementation reference section 20.
 
-## 21. Announce meaningful selection changes
+## 21. Announce selection only when the user selects
 
-Selection state should be available in status or accessible text, not only visually.
-- Announce concise selection summaries for primary lists and tables.
-- Use semantic accessible text roles on rows and cells.
+Selection state should be available in status or accessible text, not only visually, without adding noise.
+- While the user arrows through a table or list, let the cell's accessible text speak. Do not also announce through the status bar.
+- Announce after explicit selection actions, such as multi-select ("3 selected").
+- Keep the status text current so Alt+/ can read it.
 
 See implementation reference section 21.
 
@@ -169,3 +184,43 @@ Tab should move through the workflow, not every table cell.
 - Define explicit tab order around tables.
 
 See implementation reference section 22.
+
+## 23. Open windows quietly and predictably
+
+When a window opens, the screen reader should speak only that window.
+- Set starting values in the constructor, before the window is shown.
+- Set first focus after the window is shown.
+- Announce nothing while the window is hidden.
+- When a menu item opens a window, keep focus off the window behind it until the new window is shown.
+
+See implementation reference sections 23 and 26.
+
+## 24. Choose controls that read back reliably
+
+Some controls are noisy or change value silently with a screen reader.
+- A spin box speaks every Up/Down step and can change its value while the user reviews it. When a screen reader is running, use a typed text field with a placeholder and validate on save.
+- Keep the familiar control for sighted users when it works well for them.
+
+See implementation reference section 25.
+
+## 25. Keep the interface responsive and stable during background work
+
+- Show and focus a progress window before disabling the controls that started the work.
+- When background work finishes, bring the window forward and focus its default button before announcing.
+- Never update widgets from a worker thread.
+
+See implementation reference section 28.
+
+## 26. Testing gate
+
+Before marking a UI change done:
+1. Tab through every new control; each speaks a useful name and, where it has one, a value.
+2. Activate the primary action and Cancel/Close with the keyboard only.
+3. Alt+/ reads the latest status after a meaningful action.
+4. Focus returns to a sensible place after each dialog or message box closes.
+5. Insert+T reads the new window's title, and only the new window is spoken when it opens.
+6. A box over a dialog is not preceded by "<title> unavailable".
+7. Tables read cell content, not coordinates or row numbers.
+8. Dialog text reads each line once, with no repeated wrapped lines.
+
+See implementation reference section 29.

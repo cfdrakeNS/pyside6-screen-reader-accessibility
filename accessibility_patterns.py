@@ -493,7 +493,7 @@ class MaskedYearEdit(QLineEdit):
 
 
 def make_year_field(parent=None, *, min_year: int | None = None, max_year: int | None = None):
-    """Year field: typed MaskedYearEdit when a screen reader is active, else QSpinBox.
+    """Year field: typed MaskedYearEdit when a screen reader is active, else QSpinBox (section 25).
 
     Both support ``setValue()`` and ``value()``. Check the field with
     ``validate_year_field()`` before saving.
