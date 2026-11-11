@@ -629,8 +629,37 @@ class PlotLineList(QListWidget):
             self.setCurrentRow(0)
 
 
+def build_accessible_table_style() -> str:
+    """Solid highlight on the selected cell; no hover or focus-rectangle noise (section 9)."""
+    return (
+        "QTableWidget, QTableView { outline: 0; }"
+        "QTableWidget::item:selected, QTableView::item:selected {"
+        " background-color: palette(highlight); color: palette(highlighted-text);"
+        " border: none; outline: none; }"
+        "QTableWidget::item:hover, QTableView::item:hover {"
+        " background-color: palette(base); color: palette(text); }"
+        "QTableWidget::item:selected:hover, QTableView::item:selected:hover {"
+        " background-color: palette(highlight); color: palette(highlighted-text); }"
+    )
+
+
+def keep_selection_visible_when_inactive(widget: QWidget) -> None:
+    """Use the active highlight colors when the view loses focus.
+
+    Qt's default inactive selection is pale and hard to see at low vision.
+    """
+    palette = widget.palette()
+    for role in (QPalette.ColorRole.Highlight, QPalette.ColorRole.HighlightedText):
+        palette.setColor(
+            QPalette.ColorGroup.Inactive,
+            role,
+            palette.color(QPalette.ColorGroup.Active, role),
+        )
+    widget.setPalette(palette)
+
+
 def configure_table(table: QTableWidget) -> None:
-    """Hide row headers and reduce hover noise (section 9)."""
+    """Hide row headers, reduce hover noise, and make selection easy to see (section 9)."""
     table.verticalHeader().setVisible(False)
     row_count = table.rowCount()
     if row_count:
@@ -639,6 +668,8 @@ def configure_table(table: QTableWidget) -> None:
     table.viewport().setMouseTracking(False)
     table.setAttribute(Qt.WidgetAttribute.WA_Hover, False)
     table.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover, False)
+    table.setStyleSheet(build_accessible_table_style())
+    keep_selection_visible_when_inactive(table)
 
 
 def make_accessible_table_key_press(table: QTableWidget, parent: QWidget):

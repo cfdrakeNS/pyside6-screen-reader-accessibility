@@ -18,7 +18,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from accessibility_patterns import exec_styled_message_box
+from accessibility_patterns import (
+    build_accessible_table_style,
+    exec_styled_message_box,
+    keep_selection_visible_when_inactive,
+)
 
 
 def _focus_refire_delay_ms() -> int:
@@ -127,6 +131,8 @@ def exec_shortcuts_dialog(parent, title: str, shortcuts) -> int:
     table.viewport().setMouseTracking(False)
     table.setAttribute(Qt.WidgetAttribute.WA_Hover, False)
     table.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover, False)
+    table.setStyleSheet(build_accessible_table_style())
+    keep_selection_visible_when_inactive(table)
 
     for row, (key, action) in enumerate(shortcuts):
         item = QTableWidgetItem(f"{action} - {key}")
