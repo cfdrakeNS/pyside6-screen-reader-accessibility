@@ -62,10 +62,12 @@ class InfoDialog(AccessibleDialog):
                 ("body", "Sample Info Dialog - accessibility patterns demo"),
                 ("body", "This dialog is an accessibility root window."),
                 ("heading", "WHAT TO CHECK"),
-                ("item", "Insert+T reads Sample Info Dialog, not the window behind it."),
+                ("item", "Insert+T reads the window title: Sample Info Dialog."),
+                ("item", "It should not read the title of the window behind it."),
                 ("item", "Up and Down arrows read this text one line at a time."),
                 ("item", "Test message box opens a box over this dialog."),
                 ("item", "JAWS should not say Sample Info Dialog unavailable first."),
+                ("item", "In the message box, Insert+B reads the whole box."),
                 ("item", "Tab moves to the Test message box and Close buttons."),
                 ("heading", "HOW THIS TEXT IS BUILT"),
                 ("body", "Each heading, line, and list item is its own paragraph."),
@@ -106,7 +108,10 @@ class InfoDialog(AccessibleDialog):
             self,
             icon=QMessageBox.Icon.Information,
             title="Message Over Dialog",
-            text="This box is owned by Sample Info Dialog, which stays enabled behind it.",
+            text=(
+                "This box is owned by Sample Info Dialog, which stays enabled behind it.\n"
+                "Press Insert+B to read this message again."
+            ),
             button_accessibility={
                 QMessageBox.StandardButton.Ok: ("OK", "Close this message and return to the dialog"),
             },
