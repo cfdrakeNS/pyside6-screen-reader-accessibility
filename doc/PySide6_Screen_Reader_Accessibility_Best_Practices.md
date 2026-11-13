@@ -2,6 +2,14 @@
 
 This document is a principles-first reference for designing accessible PySide6 interfaces. Code patterns are in [PySide6_Accessibility_Patterns_and_Implementation_Reference.md](PySide6_Accessibility_Patterns_and_Implementation_Reference.md) (the implementation reference), and runnable examples are in this repository (`main.py` and helper modules). The mapping to the AbCS standards is in [AbCS_Standards_Crosswalk.md](AbCS_Standards_Crosswalk.md).
 
+The code and these notes are MIT No Attribution (MIT-0). The terms are in [LICENSE](../LICENSE).
+
+## How to read these rules
+
+- **Practice.** Broad advice: names and descriptions, keyboard access, restoring focus, announcing meaningful changes, and keeping essentials out of descriptions.
+- **Observed workaround.** A fix for behavior seen with the screen readers and Qt versions in the implementation reference version summary.
+- **AbCS choice.** A decision from the AbCS application. The implementation reference marks those with **AbCS production**.
+
 ## 1. Never rely on visuals alone
 
 If text matters, expose it through accessible widgets and metadata.
@@ -31,7 +39,8 @@ Always define meaningful names and descriptions for important controls, groups, 
 ## 4. Status changes must be announced
 
 Do not rely only on `QStatusBar.showMessage()`.
-- Announce meaningful changes, such as save, delete, or a validation failure.
+- Announce meaningful changes, such as save, delete, or a validation failure. Announce after the action is finished.
+- **Observed workaround.** This repository's tested method briefly moves focus to the status bar, then restores it. That pulse is a real focus change: it can interrupt typing, and a focus-out check must ignore it (principle 28). Qt 6.8 added an announcement event. The implementation reference section 1 compares it with the focus pulse. This repository has not tested that event.
 - Provide explicit re-read support (for example `Alt+/`).
 - Never announce from a hidden window. The announcement lands on the window behind it, and the screen reader reads that window's title instead (principle 23).
 - Keep shortcut hints out of status messages. Put them in accessible descriptions and the F1 list. The exception is "Press Escape to cancel" or "Esc to close" during a long operation.
@@ -68,8 +77,8 @@ For About, License, Setup, and info text:
 - Use a read-only text area, not a `QLabel`. Give it a short accessible name; put the content in the document, not the name.
 - Short instructions (1 to 3 sentences) are the exception: a focusable label may carry its whole text as its name, so it is read at once.
 - Make each heading, line, and list item its own paragraph.
-- Do not let paragraphs wrap. JAWS reads each wrapped line as you arrow, then rereads the whole paragraph. Keep sentences short and size the dialog to fit the longest one.
-- Remove empty lines, which can make JAWS repeat the previous line.
+- **Observed workaround.** JAWS reads each visual line of a wrapped paragraph, then rereads the whole paragraph. Keep each sentence short. Size the dialog so it does not wrap, up to 90% of the screen width. On a narrow screen or at high zoom, split the sentence. A help viewer whose text cannot fit may wrap, and still keeps one sentence per paragraph.
+- Remove empty lines. An empty line can make JAWS repeat the previous line. On Windows, Qt's text interface reports that empty line as the previous line ([QTBUG-105035](https://bugreports.qt.io/browse/QTBUG-105035)).
 
 For long prose in view mode (for example a book plot):
 - Use one list row per review line, with the rating on its own first row.
@@ -81,7 +90,7 @@ See implementation reference sections 7, 11, and 12.
 
 - Give every cell spoken text, and leave no cell empty. An empty cell or a cell without accessible text makes JAWS read its coordinates.
 - In a label/value table, make each cell speak "label: value", so either cell reads the whole row.
-- Silence row headers completely. Hiding them is not enough; also disable them and label them empty.
+- **Observed workaround** for a label/value table, where a row number is noise: silence the vertical header completely. Hiding it is not enough; also disable it and label it empty. A table whose row header is the record name should keep that header and give it useful text.
 - Make the selection easy to see: a solid highlight that stays visible when the table loses focus.
 - Do not announce on every arrow key (principle 21).
 
@@ -100,8 +109,8 @@ See implementation reference section 24.
 
 When a dialog opens, screen readers must identify **that dialog** as the current window, not the window behind it.
 
-- Do not use `QDialog(parent=mainWindow)` for feature dialogs. Qt exposes it as an accessibility child of the parent, so the JAWS/NVDA command Insert+T reads the parent's title.
-- Use `AccessibleDialog` (`styled_dialogs.py`). The logical parent is used for Win32 ownership and z-order, but the Qt parent is `None`, so the dialog is a root in the MSAA/UIA tree.
+- **Observed workaround** for feature dialogs on Windows with JAWS and NVDA (implementation reference version summary). Qt exposes `QDialog(parent=mainWindow)` as an accessibility child of the parent, so the JAWS/NVDA command Insert+T reads the parent's title.
+- Use `AccessibleDialog` (`styled_dialogs.py`) for those feature dialogs. The logical parent is used for Win32 ownership and z-order, but the Qt parent is `None`, so the dialog is a root in the MSAA/UIA tree.
 - Verify with the JAWS/NVDA command Insert+T after opening each major window and each F1 help popup. Insert+T and Insert+B are screen reader commands, not application shortcuts.
 - The JAWS/NVDA command Insert+B reads the dialog.
 - Once focus has been in a text field, the JAWS/NVDA command Insert+B reads only the title and the focused control, for the rest of that dialog's life. Keep text fields out of small dialogs that must be read whole; for a date, use Year, Month, and Day combo boxes (implementation reference section 5).
@@ -127,7 +136,7 @@ Documentation model:
 
 Do not assume every user wants spoken status updates.
 - `QAccessible.isActive()` alone is not a screen reader test; Magnifier and the touch keyboard also turn it on.
-- Change the interface (typed fields, hidden visual content) only when a screen reader process is running.
+- **Observed workaround.** Changing the interface when a screen reader process is detected is optional. This demo swaps the year spin box for a typed field at creation time (principle 24). An application can offer a user setting for the same choice. These notes do not add that setting. Sighted use keeps the familiar control.
 - Allow announcements when either check is true, so speech still works with an unknown reader.
 - Use per-reader timing when restoring focus after status readback.
 
@@ -218,8 +227,8 @@ See implementation reference sections 23 and 26.
 ## 24. Choose controls that read back reliably
 
 Some controls are noisy or change value silently with a screen reader.
-- A spin box speaks every Up/Down step and can change its value while the user reviews it. When a screen reader is running, use a typed text field with a placeholder and validate on save.
-- Keep the familiar control for sighted users when it works well for them.
+- **Observed workaround.** A spin box speaks every Up/Down step and can change its value while the user reviews it. One adaptation is a typed text field with a placeholder, validated on save, used when a screen reader process is detected. This demo does that for the year field. An application can offer a user setting for the same choice.
+- Keep the familiar control when a screen reader is not detected.
 
 See implementation reference section 25.
 

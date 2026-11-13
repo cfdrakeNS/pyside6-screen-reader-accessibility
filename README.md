@@ -1,10 +1,23 @@
 # pyside6-screen-reader-accessibility
 
-Screen reader accessibility patterns for PySide6 desktop apps, tested with JAWS, NVDA, Narrator, and Orca. A runnable demo plus copy-paste helpers and documentation. The patterns also apply to PyQt6.
+Practical PySide6 screen reader accessibility patterns, testing notes, and workarounds. For developers who need observed JAWS and NVDA behavior with Qt widgets, plus copyable helpers and a manual check.
+
+The JAWS and NVDA notes were taken on Windows 11 Pro 26H2 with JAWS 2026, NVDA 2026.3.1, and Qt 6.12 in November 2026. JAWS 2026 and NVDA 2026.3.1 were the current releases of those readers then. The implementation reference version summary records what was checked. Narrator and Orca have focus-restore delays in the helpers. This repository does not record a full recheck with those readers.
+
+The ideas transfer to PyQt6. The helpers are PySide6, and this repository does not record a PyQt6 run.
 
 **Repository:** https://github.com/cfdrakeNS/pyside6-screen-reader-accessibility
 
 Formerly `pyside6-accessible-ui-reference`. Old GitHub links redirect here.
+
+## Start here
+
+Insert+T and Insert+B in this list are JAWS/NVDA commands, not shortcuts this demo defines.
+
+- Once focus enters a text field, the JAWS/NVDA command Insert+B stops reading the whole dialog. Year, Month, and Day combo boxes keep that command working. Implementation reference section 5, `ReadDateDialog`.
+- A dialog created with a Qt parent makes the JAWS/NVDA command Insert+T read the owner window's title. `AccessibleDialog` is the workaround. Section 4, `InfoDialog`.
+- A message box that disables the dialog behind it is spoken as "<title> unavailable". Sections 18 and 24, `exec_styled_message_box`.
+- Tables speak cell content, and dialog prose is read once per line. An empty line can make JAWS repeat the previous line, and a wrapped paragraph is read twice. Sections 9 and 11.
 
 ## Purpose
 
@@ -87,7 +100,7 @@ Sections 14 and 15 (screen reader detection, QAccessible startup) are in `access
 
 ## Validation
 
-Before changing a pattern, run the manual JAWS/NVDA check in implementation reference section 29: names on Tab, keyboard-only actions, Alt+/, focus after each dialog and message box, the JAWS/NVDA command Insert+T for titles, no "unavailable" before a box, tables read content, dialog text read once per line, value fields speak the new value, and Escape runs the same check as the close box.
+Before changing a pattern, read the version summary in the implementation reference, then run the manual JAWS/NVDA check in section 29: names on Tab, keyboard-only actions, Alt+/, focus after each dialog and message box, the JAWS/NVDA command Insert+T for titles, no "unavailable" before a box, tables read content, dialog text read once per line, value fields speak the new value, and Escape runs the same check as the close box.
 
 ## Using as a reference
 

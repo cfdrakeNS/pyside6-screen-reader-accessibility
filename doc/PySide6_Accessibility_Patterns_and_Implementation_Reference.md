@@ -9,26 +9,77 @@ Runnable sample files (repository root):
 
 **Production examples.** Some sections name windows from [AbCS](https://github.com/cfdrakeNS/AbCS_Audiobook_Collector_Scanner) (Audio Book Collector Scanner), the application these patterns came from. Those are marked **AbCS production** and are not part of this repository.
 
+The code and these notes are MIT No Attribution (MIT-0). The terms are in [LICENSE](../LICENSE).
+
+## How to read a section
+
+- **Practice.** Broad advice: names and descriptions, keyboard access, restoring focus, announcing meaningful changes, and keeping essentials out of descriptions.
+- **Observed workaround.** A fix for behavior seen with the screen readers and Qt versions in the version summary below.
+- **AbCS choice.** A decision from the AbCS application, marked **AbCS production**.
+
+Each section has a status line. **In the demo** means the pattern is in this repository. **Covered by the section 29 gate** means that manual check exercises it. **Explicit test** names the environment below. **AbCS 3.1 retest** is used only where the section says that retest confirmed the behavior. **AbCS pattern** means the November 2026 audit of AbCS, and that section does not record its own retest.
+
+## Version summary
+
+JAWS and NVDA notes in this document were taken on Windows 11 Pro 26H2 with JAWS 2026, NVDA 2026.3.1, and Qt 6.12 in November 2026. JAWS 2026 and NVDA 2026.3.1 were the current releases of those readers then.
+
+- The install floor is PySide6 6.6 or newer (`requirements.txt`). These notes do not name an exact PySide6 patch.
+- The focus refire delay changes at Qt 6.11 (section 4). Qt 6.8 added `QAccessibleAnnouncementEvent` (section 1). This repository has not compared that event with a screen reader.
+- The Insert+B bench (section 5) and the dialog-line check (section 11) use the environment above.
+- Focus-restore delays exist for JAWS (300 ms), NVDA (1500 ms), Narrator (3500 ms), and Orca (800 ms) (section 14). Those delays do not mean every pattern was rechecked with Narrator or Orca. The Windows 11 Pro 26H2 line above is the JAWS and NVDA environment.
+- The ideas transfer to PyQt6. The helpers are PySide6, and this repository does not record a PyQt6 run.
+
+## Qt behavior and screen reader behavior
+
+The first list is Qt's accessibility bridge or a Qt widget. The second is what JAWS or NVDA did in the environment above. [QTBUG-105035](https://bugreports.qt.io/browse/QTBUG-105035) matches the blank-line finding. This repository has not filed new Qt bug reports.
+
+### Qt accessibility bridge and widget behavior
+
+- A parented `QDialog` is an accessibility child, so the JAWS/NVDA command Insert+T reads the owner title (section 4).
+- Focus registration on show changed at Qt 6.11 (section 4).
+- `QTextDocument.idealWidth()` inside a `QTextEdit` returns the wrapped width (section 11).
+- An empty line in a text widget is reported as the previous line on Windows ([QTBUG-105035](https://bugreports.qt.io/browse/QTBUG-105035)). JAWS then repeats the previous line (section 11).
+- An empty `specialValueText` is ignored, so a blank date is read as 1752-09-14 (section 32).
+- `QAction` has no accessible name or description in PySide6. On Qt 6.3, `triggered(bool)` passes `False` (section 27).
+- `QComboBox` has no read-only mode (section 33).
+- Qt can skip Tab stops. The AbCS Listen window works around Rewind and Forward (section 34).
+- Qt dark-mode detection was unreliable, so AbCS reads the Windows registry (section 41).
+
+### Screen reader behavior
+
+- After focus enters a text field, the JAWS/NVDA command Insert+B reads only the title and that control for the rest of the dialog (section 5). Insert+T and Insert+B are JAWS/NVDA commands, not application shortcuts.
+- JAWS reads a wrapped paragraph line by line and then again as a whole (section 11).
+- JAWS says "<title> unavailable" when a message box disables the dialog behind it (section 18).
+- JAWS reads coordinates for an empty cell, and can still read a row header after it is hidden (section 9).
+
 ## Scope
+
+**Status:** Scope statement for this reference.
 
 Use this document when implementing or refactoring windows, dialogs, forms, and tables in PySide6 applications.
 
 ## 1. Status announcement pattern
 
+**Status:** In the demo. Covered by the section 29 gate (Alt+/ reads the latest status).
+
 Goal: make status updates reliably available to screen reader users.
 
 Pattern:
 - Provide a per-window status API: `AccessibilityMixin.set_status(message, announce=False)`.
-- `announce=True` briefly moves focus to the status bar so the screen reader reads it, then restores focus (`announce_status_message`). The delay depends on the detected screen reader (section 14).
+- `announce=True` briefly moves focus to the status bar so the screen reader reads it, then restores focus (`announce_status_message`). The delay depends on the detected screen reader (section 14). **Observed workaround.** The focus pulse is the status method tested with JAWS and NVDA in the version summary. A pulse is a real focus change. It can interrupt typing, and a focus-out check must ignore it (section 31). Announce after a completed action, such as save or a validation failure.
 - Announce only while the window is visible. `set_status` ignores `announce=True` when `self.isVisible()` is false (section 23).
 - Keep a default status message for explicit readback, and support **Alt+/** to re-read the current status (`read_status_bar_message`).
 - Announce only meaningful state changes, such as save, delete, or a validation failure. Do not announce on every arrow key (section 21).
 - Keep shortcut hints out of status messages ("Saved", not "Saved. Press Ctrl+S to save again"). Hints belong in accessible descriptions and the F1 list. The one exception is "Press Escape to cancel" or "Esc to close" while a long operation runs. AbCS Find and Recently Added add "Alt+/ read status" to the on-screen status only when a screen reader is running.
 - When focus is restored after the announcement, `announce_status_message` uses the application focus widget, or the window's own focus widget if the window is not active yet (section 24).
 
+**Qt 6.8 announcement event.** Qt 6.8 added [`QAccessibleAnnouncementEvent`](https://doc.qt.io/qt-6.8/qaccessibleannouncementevent.html). `QAccessible.AnnouncementPoliteness.Polite` waits for a pause in typing or speech. `Assertive` interrupts. The install floor of this repository is PySide6 6.6, which is before that event existed. Status speech in this demo is the focus pulse in `announce_status_message`, and that is what the JAWS and NVDA notes describe. This repository has not compared the announcement event with JAWS, NVDA, Narrator, or Orca. A comparison would be useful. The event's existence does not replace the pulse in these helpers.
+
 Reference: `accessibility_patterns.py` (`announce_status_message`, `read_status_bar_message`, `AccessibilityMixin.set_status`), `main.py` (`AccessibleSampleWindow.on_save`, `on_delete`).
 
 ## 2. Editable combo anti-noise pattern
+
+**Status:** In the demo.
 
 Goal: prevent silent value changes and accidental edits.
 
@@ -43,6 +94,8 @@ Reference: `accessibility_patterns.py` (`AccessibilityMixin.eventFilter`, `_shou
 
 ## 3. Alt-key hygiene pattern
 
+**Status:** In the demo.
+
 Goal: avoid stray Alt+letter input leaking into text fields.
 
 Pattern:
@@ -54,7 +107,11 @@ Reference: `accessibility_patterns.py` (`is_unmapped_alt_letter`, `Accessibility
 
 ## 4. AccessibleDialog window title pattern (JAWS/NVDA command Insert+T)
 
+**Status:** In the demo. Covered by the section 29 gate (the JAWS/NVDA command Insert+T reads the new window's title).
+
 Goal: ensure screen readers read the **active dialog title**, not the window behind it.
+
+**Observed workaround** for feature dialogs on Windows with JAWS and NVDA (version summary). `AccessibleDialog` is what this project uses. A modeless utility that must stay above its owner through Qt z-order can stay a parented `QDialog`. The AbCS `ImportProgressWindow` exception below is that case.
 
 ### Problem
 
@@ -94,6 +151,8 @@ Reference: `styled_dialogs.py` (`AccessibleDialog`, `_focus_refire_delay_ms`, `_
 
 ## 5. Modal dialog accessibility pattern
 
+**Status:** In the demo. Explicit test for the Insert+B text-field limit: Windows 11 Pro 26H2, JAWS 2026, NVDA 2026.3.1, Qt 6.12, November 2026, 19 popup variants. Covered by the section 29 gate (the JAWS/NVDA command Insert+B reads the dialog).
+
 Goal: make warnings, confirmations, and feature dialogs readable and actionable.
 
 Pattern:
@@ -107,7 +166,7 @@ Pattern:
 
 Once focus has been in a text field, JAWS and NVDA stop reading a Qt dialog with the JAWS/NVDA command Insert+B. Moving focus back to a button does not help: for the rest of that dialog's life, the command reads only the title and the focused control (JAWS says "paragraph" in the field). Before focus first enters a text field, the command reads the whole dialog.
 
-Tested with JAWS and NVDA on Qt 6.12, November 2026, using a test bench of 19 popup variants (demo commit 18fcd0b, `popup_lab.py`):
+Tested on Windows 11 Pro 26H2 with JAWS 2026 and NVDA 2026.3.1 on Qt 6.12, November 2026, using a test bench of 19 popup variants (demo commit 18fcd0b, `popup_lab.py`). JAWS 2026 and NVDA 2026.3.1 were the current releases of those readers then:
 
 - **Fails:** a typed date (`QLineEdit`), a `QDateEdit`, an editable combo box, and a read-only `QLineEdit`, whenever focus enters them. Also fails with the field given its own native window (`WA_NativeWindow`), or reported to the screen reader as static text.
 - **No effect:** visible labels before the field, a dialog description, a status bar, the window icon, centering, and dropping the forced first focus.
@@ -142,6 +201,8 @@ Reference: `styled_dialogs.py`, `main.py` (`InfoDialog` uses a default Close but
 
 ## 6. Keyboard shortcut implementation pattern
 
+**Status:** In the demo. Covered by the section 29 gate (keyboard-only actions, including any Alt+letter shortcut).
+
 Goal: prevent conflicts and keep shortcut behavior predictable.
 
 Pattern:
@@ -156,6 +217,8 @@ Pattern:
 Reference: `main.py` (`AccessibleSampleWindow.setup_shortcuts`).
 
 ## 7. Accessible help dialog pattern (F1)
+
+**Status:** In the demo. Section 29 names F1 among the exercises for gate items 1–8.
 
 Goal: provide a stable, readable shortcut list.
 
@@ -180,6 +243,8 @@ Reference: `styled_dialogs.py` (`exec_shortcuts_dialog`), `main.py` (`Accessible
 
 ## 8. Focus safety pattern for editable fields
 
+**Status:** In the demo.
+
 Goal: reduce accidental full-value overwrite.
 
 Pattern:
@@ -189,6 +254,8 @@ Pattern:
 Reference: `accessibility_patterns.py` (`AccessibilityMixin.focus_deselect`, `eventFilter` FocusIn branch).
 
 ## 9. Table accessibility pattern
+
+**Status:** In the demo. Covered by the section 29 gate (tables read cell content, not coordinates or row numbers).
 
 Goal: JAWS and NVDA read each cell's content, not row numbers or cell coordinates, and sighted users can see the selection.
 
@@ -203,7 +270,7 @@ Goal: JAWS and NVDA read each cell's content, not row numbers or cell coordinate
 
 **Spoken text.** `set_accessible_table_rows(table, rows)` fills a label/value table from `(label, value)` pairs. Both cells in a row get the same `AccessibleTextRole`, `"label: value"`, so arrowing to either cell reads the label and value together. No cell is left empty.
 
-**Row headers.** `configure_table(table)` silences the vertical header. It hides and disables it, removes focus, makes it non-clickable and non-highlighting, labels every section `""`, and names it "Table Row Headers".
+**Row headers.** **Observed workaround** for a label/value table, where a row number is noise. `configure_table(table)` silences the vertical header. It hides and disables it, removes focus, makes it non-clickable and non-highlighting, labels every section `""`, and names it "Table Row Headers". A table whose row header is the record name should keep that header and give it useful text.
 
 **Selection visibility.** `configure_table` also applies `build_accessible_table_style()`, which gives the selected cell a solid `palette(highlight)` fill with `palette(highlighted-text)` and no hover change. `keep_selection_visible_when_inactive(table)` copies the active highlight colors into the inactive palette group, so the selection stays visible after Tab leaves the table.
 
@@ -237,6 +304,8 @@ Reference: `accessibility_patterns.py` (`configure_table`, `select_first_cell_wh
 
 ## 10. About/Info dialog pattern
 
+**Status:** In the demo. Covered by the section 29 gate (dialog text reads each line once, and the JAWS/NVDA command Insert+T reads the dialog title).
+
 Goal: a consistent, accessible approach for About, License, Setup, and other informational dialogs.
 
 Pattern:
@@ -263,6 +332,8 @@ def on_open_info_dialog(self):
 Reference: `main.py` (`InfoDialog`, `AccessibleSampleWindow.on_open_info_dialog`), `accessibility_patterns.py` (`create_dialog_html_text`, `fit_dialog_width_to_text`).
 
 ## 11. Read-only navigable text pattern
+
+**Status:** In the demo. Explicit test: Windows 11 Pro 26H2, JAWS 2026, NVDA 2026.3.1, Qt 6.12, November 2026. JAWS and NVDA testing confirmed each line is read once for the AbCS prose helper. Covered by the section 29 gate (dialog text reads each line once, with no repeated wrapped lines).
 
 Goal: let JAWS/NVDA users move through static help, About, or License text one line at a time with arrow keys.
 
@@ -294,9 +365,9 @@ layout.addWidget(self.body, stretch=1)
 fit_dialog_width_to_text(self, self.body, height=420)
 ```
 
-**No wrapping.** Keep each block to one short sentence. `fit_dialog_width_to_text()` measures every paragraph with the widget's font (including bold headings and item indents) and widens the dialog so none wraps, capped at 90% of the screen width. Call it after the layout is built. Do not use `QTextDocument.idealWidth()` for this; inside a `QTextEdit` it returns the current wrapped width.
+**No wrapping.** **Observed workaround.** JAWS reads each visual line of a wrapped paragraph, then rereads the whole paragraph. Keep each block to one short sentence. `fit_dialog_width_to_text()` measures every paragraph with the widget's font (including bold headings and item indents) and widens the dialog so none wraps, capped at 90% of the screen width. On a narrow screen or at high zoom, split the sentence instead of letting it wrap. Call it after the layout is built. Do not use `QTextDocument.idealWidth()` for this; inside a `QTextEdit` it returns the current wrapped width. An empty line can make JAWS repeat the previous line. On Windows, Qt's text interface reports that empty line as the previous line ([QTBUG-105035](https://bugreports.qt.io/browse/QTBUG-105035)).
 
-**AbCS production.** `prepare_dialog_prose()` in AbCS `src/accessibility/dialog_prose.py` goes one step further for long text (About, License, Setup): it splits any block that would still pass the screen-width cap at sentence, semicolon, comma, or word boundaries, turns wrapping off, and sizes the dialog. JAWS and NVDA testing confirmed each line is then read once.
+**AbCS production.** `prepare_dialog_prose()` in AbCS `src/accessibility/dialog_prose.py` goes one step further for long text (About, License, Setup): it splits any block that would still pass the screen-width cap at sentence, semicolon, comma, or word boundaries, turns wrapping off, and sizes the dialog. JAWS and NVDA testing in the version summary environment confirmed each line is then read once.
 
 ### Solution for plain text: `create_accessible_read_only_text()`
 
@@ -312,13 +383,15 @@ Both helpers apply the same keyboard review settings (`configure_navigable_text_
 
 - Do not put body text in `setAccessibleName()`. Use a short name and a short description of the content.
 - **Exception: short instructions.** A focusable instruction label of 1 to 3 sentences may carry its whole text as its accessible name, so the screen reader reads it at once when Tab reaches it. Do not set text interaction flags on it (that switches Qt to line-by-line text reading). Anything longer uses line review.
-- One sentence per block; no paragraph may wrap at the dialog's width. A help viewer whose text cannot fit may wrap, but still keeps one sentence per paragraph.
+- One sentence per block. Size the dialog so the sentence does not wrap, up to 90% of the screen width. On a narrow screen or at high zoom, split the sentence. A help viewer whose text cannot fit may wrap, and still keeps one sentence per paragraph.
 - Decorative graphics (for example a splash image) use `Qt.NoFocus`. An image that carries information (for example a cover that may be missing) takes focus and has a spoken name such as "Book cover" or "No cover".
 - Set initial focus to the text area in `showEvent` with `QTimer.singleShot(0, ...)`.
 
 Reference: `accessibility_patterns.py` (`create_dialog_html_text`, `blocks_to_dialog_html`, `fit_dialog_width_to_text`, `create_accessible_read_only_text`, `configure_navigable_text_edit`), `main.py` (`InfoDialog`, `_build_text_tab`).
 
 ## 12. Plot field line-by-line review pattern
+
+**Status:** In the demo.
 
 Goal: let screen reader users review long prose (for example a book plot) line by line in view mode while keeping continuous prose in storage and edit mode.
 
@@ -364,6 +437,8 @@ Reference: `accessibility_patterns.py` (`PlotLineList`, `plot_lines_for_review`)
 
 ## 13. Decision policy: defect vs intentional noise reduction
 
+**Status:** Review policy for this reference.
+
 Use this policy in reviews:
 - Confirmed defect: required information or action is not reliably accessible.
 - Intentional design: reduced announcement noise but required access remains explicit and testable.
@@ -371,7 +446,11 @@ Use this policy in reviews:
 
 ## 14. Screen reader process detection pattern
 
+**Status:** In the demo. The per-reader delays are in the code. Narrator and Orca coverage is not itemized in the version summary.
+
 Goal: gate speech-only behavior when a screen reader is likely active.
+
+**Observed workaround.** Changing a control because a screen reader process is running is optional. This demo does it for the year field (section 25), when the field is created. An application can offer a user setting for the same choice. These helpers do not include that setting.
 
 Pattern:
 - Scan running processes for known screen reader executables (JAWS, NVDA, Narrator, Orca).
@@ -386,6 +465,8 @@ Reference: `accessibility_patterns.py` (`get_active_screen_reader`, `is_screen_r
 
 ## 15. QAccessible initialization pattern
 
+**Status:** In the demo.
+
 Goal: ensure Qt's accessibility bridge is active before windows open.
 
 Pattern:
@@ -396,6 +477,8 @@ Pattern:
 Reference: `accessibility_patterns.py` (`init_app_accessibility`), `main.py` (`main`).
 
 ## 16. Dialog lifecycle event pattern
+
+**Status:** In the demo.
 
 Goal: notify screen readers when modal or feature dialogs open and close.
 
@@ -410,6 +493,8 @@ Reference: `accessibility_patterns.py` (`announce_dialog_opened`, `announce_dial
 
 ## 17. Tooltip vs accessible description pattern
 
+**Status:** In the demo.
+
 Goal: give sighted users tooltips without overwriting screen reader descriptions.
 
 Pattern:
@@ -421,6 +506,8 @@ Pattern:
 Reference: `accessibility_patterns.py` (`apply_tooltip_accessibility`), `main.py` (Save, Delete, and Info Dialog buttons).
 
 ## 18. Styled message box pattern
+
+**Status:** In the demo. Covered by the section 29 gate (a box over a dialog is not preceded by "<title> unavailable").
 
 Goal: make validation and confirmation boxes readable and keyboard-safe, including over another dialog.
 
@@ -448,6 +535,8 @@ Reference: `accessibility_patterns.py` (`exec_styled_message_box`), `styled_dial
 
 ## 19. UI scaling pattern
 
+**Status:** AbCS pattern. This demo sets a fixed dialog font and does not include `UIScaler`.
+
 Goal: keep controls readable at high zoom without breaking focus or table semantics.
 
 Pattern:
@@ -461,6 +550,8 @@ This demo sets a fixed 10 pt dialog font (`AccessibleDialog`) and uses system pa
 **AbCS production.** `UIScaler` (`src/accessibility/scaling.py`) and `build_accessible_button_style()` (`src/accessibility/style_helpers.py`) implement full scaling.
 
 ## 20. Help system architecture pattern
+
+**Status:** In the demo for F1. The help router and `help_docs/` folder are an AbCS pattern. Shift+F1 in the demo is a stub message box.
 
 Goal: provide discoverable, context-sensitive help without accessibility noise.
 
@@ -476,6 +567,8 @@ This demo's Shift+F1 is a stub message box (`AccessibleSampleWindow.on_context_h
 **AbCS production.** `src/ui/help_router.py` (`install_shift_f1_help`, `show_context_help`) and the `help_docs/` folder.
 
 ## 21. Selection announcement pattern
+
+**Status:** In the demo. Section 29 item 9 (a stepped value speaks, and arrowing a table does not announce) is described as applying to stepped-value windows. The demo's table does not announce on each arrow.
 
 Goal: make selection changes available without relying on visual highlighting, and without speech noise.
 
@@ -493,6 +586,8 @@ Reference: `accessibility_patterns.py` (`announce_selection`), `main.py` (`Acces
 
 ## 22. Tab-exits-table pattern
 
+**Status:** In the demo.
+
 Goal: prevent Tab from trapping users inside large tables.
 
 Pattern:
@@ -504,6 +599,8 @@ Pattern:
 Reference: `accessibility_patterns.py` (`make_accessible_table_key_press`), `main.py` (`_build_form_tab`).
 
 ## 23. Window open lifecycle pattern
+
+**Status:** In the demo. Covered by the section 29 gate (only the new window is spoken when it opens).
 
 Goal: the screen reader speaks only the new window when it opens, starting at the right control.
 
@@ -534,6 +631,8 @@ Reference: `main.py` (`AccessibleSampleWindow.showEvent`, `InfoDialog.showEvent`
 
 ## 24. Focus restore after modal dialogs and message boxes
 
+**Status:** In the demo. Covered by the section 29 gate (focus returns after each dialog or message box).
+
 Goal: after any modal closes, focus returns to a sensible control and the screen reader reads it.
 
 Pattern:
@@ -548,7 +647,11 @@ Reference: `accessibility_patterns.py` (`exec_styled_message_box`, `announce_sta
 
 ## 25. Screen reader year field pattern
 
-Goal: a year field that reads back reliably with a screen reader, and keeps the familiar spin box for sighted users.
+**Status:** In the demo. Section 29 names Save with an invalid year among the demo exercises. Item 9, Up or Down speaking the new value, applies to stepped-value windows and is not listed as exercised by the demo.
+
+Goal: a year field that reads back reliably with a screen reader, and keeps the spin box when a screen reader is not detected.
+
+**Observed workaround.** The spin-box swap is an optional adaptation for step-by-step speech and a value that can change while the user reviews the field. This demo applies it when a reader process is detected, at field creation, and leaves the spin box in place otherwise. An application can use a user setting for the same choice. These helpers do not include that setting.
 
 ### Problem
 
@@ -583,6 +686,8 @@ Reference: `accessibility_patterns.py` (`make_year_field`, `MaskedYearEdit`, `va
 
 ## 26. Menu-open focus hold pattern (AbCS production)
 
+**Status:** AbCS pattern from the November 2026 audit. Not in this demo.
+
 Goal: when a keyboard-chosen menu item opens a window, the screen reader speaks only the new window.
 
 Problem: when the menu closes, focus returns to the main window's table for a moment, and the screen reader says "book table" before the new window appears.
@@ -592,6 +697,8 @@ Pattern: the main window holds focus on the menu bar while a keyboard-chosen men
 This demo has no menu bar. **AbCS production:** `_hold_focus_for_menu_action` in `src/ui/main_window.py`.
 
 ## 27. QAction accessible names
+
+**Status:** AbCS pattern from the November 2026 audit. Not in this demo. The `QAction` name limit is Qt behavior, listed with the Qt notes above.
 
 `QAction` menu items use their menu text as the spoken name. Do not call `setAccessibleName` on a `QAction`; Qt does not support it. Give each action clear menu text, and keep decorative icons out of it (section 17).
 
@@ -609,6 +716,8 @@ Reference: AbCS `src/ui/main_window.py` (menu builder), `src/accessibility/style
 
 ## 28. Progress windows, modal completion, and worker threads (AbCS production)
 
+**Status:** AbCS pattern. Not in this demo. Section 39 records what the AbCS 3.1 retest confirmed about progress windows.
+
 Principles from AbCS background work (import, web fetch, Calibre):
 - **Opening a progress window:** show, raise, activate, and focus the progress window **before** disabling the caller's buttons. Disabling the focused button first moves focus to the next control, for example an instructions label, and the screen reader reads it. If a confirm box just closed, let that window finish becoming active before the progress window opens (section 18). The progress window is the next thing spoken.
 - **Modal completion after background work:** `raise_()`, `activateWindow()`, and focus on the **default button** (or the main action button) before announcing.
@@ -617,6 +726,8 @@ Principles from AbCS background work (import, web fetch, Calibre):
 This demo has no background work. Section 39 adds what JAWS and NVDA testing of AbCS confirmed about progress windows.
 
 ## 29. Testing gate (manual JAWS/NVDA smoke)
+
+**Status:** Manual gate for this reference. The demo exercises items 1–8. Items 9 and 10 apply to stepped-value fields and unsaved-changes prompts.
 
 Before marking a UI change done, test with at least one screen reader, and with two when possible:
 
@@ -635,9 +746,13 @@ The demo exercises items 1–8: `InfoDialog` (Test message box button), the Item
 
 ## Patterns from AbCS production (sections 30–41)
 
+**Status:** AbCS pattern. The sections below come from the November 2026 audit and are not in this demo. A section is marked AbCS 3.1 retest only where that section says the retest confirmed it.
+
 The sections below come from an audit of every accessibility workaround in AbCS (November 2026) and from the JAWS and NVDA retest of AbCS 3.1. They are not in this demo. File names are in the AbCS repository. Use them as patterns; copy the code from AbCS when you need it.
 
 ## 30. Re-reading content that changed under focus
+
+**Status:** AbCS pattern from the November 2026 audit. Not in this demo. This section does not record its own retest.
 
 Goal: the screen reader reads a field again when its content changes while it has focus.
 
@@ -655,6 +770,8 @@ Related:
 Reference: AbCS `src/ui/book_details.py`, `src/ui/help_window.py`, `src/ui/preview_window.py`.
 
 ## 31. Focus-out validation and loading guards
+
+**Status:** AbCS pattern from the November 2026 audit. Not in this demo. The second stacked year box was removed in the AbCS 3.1 retest.
 
 Goal: validation on leaving a field never fires because of an announcement, a message box, or code that fills the form.
 
@@ -675,6 +792,8 @@ Reference: AbCS `src/ui/book_details.py`, `src/ui/import_detail_window.py`, `src
 
 ## 32. Date and stepped-value fields
 
+**Status:** AbCS pattern for the date and stepped-value rules. The Year, Month, and Day combo boxes are in the demo (section 5).
+
 Goal: date and number fields that speak their value and never show a nonsense date.
 
 Pattern:
@@ -692,6 +811,8 @@ Reference: AbCS `src/accessibility/masked_date_fields.py`, `src/ui/book_details.
 
 ## 33. Read-only and noisy controls
 
+**Status:** AbCS pattern from the November 2026 audit. Not in this demo. This section does not record its own retest. The editable-combo arrow block in section 2 is in the demo.
+
 Goal: no control changes its value without the user knowing.
 
 Pattern:
@@ -706,6 +827,8 @@ Pattern:
 Reference: AbCS `src/ui/book_details.py`, `src/ui/import_detail_window.py`, `src/ui/preferences_window.py`, `src/ui/help_window.py`.
 
 ## 34. View and edit modes, and dynamic Tab order
+
+**Status:** AbCS pattern from the November 2026 audit. Not in this demo. The empty Tab stop past the last footer button is named as AbCS before 3.1.
 
 Goal: Tab reaches exactly the controls the user can see and use.
 
@@ -722,6 +845,8 @@ Reference: AbCS `src/ui/book_details.py`, `src/ui/web_metadata.py`, `src/ui/prev
 
 ## 35. Keeping unavailable actions findable
 
+**Status:** AbCS pattern from the November 2026 audit. Not in this demo. This section does not record its own retest.
+
 Goal: screen reader users can find every command and learn why it does not work right now.
 
 Pattern:
@@ -734,6 +859,8 @@ Pattern:
 Reference: AbCS `src/accessibility/accessible_app_style.py` (`AccessibleAppStyle`), `src/main.py`, `src/ui/book_details.py`, `src/ui/import_window.py`.
 
 ## 36. Records, reloads, and large selections
+
+**Status:** AbCS pattern from the November 2026 audit. Not in this demo. This section does not record its own retest.
 
 Goal: focus stays on the record the user was working with, and selection stays fast.
 
@@ -755,6 +882,8 @@ Reference: AbCS `src/ui/main_window.py` (`focus_book_by_id`, `jump_to_column`, `
 
 ## 37. Find and filter
 
+**Status:** AbCS pattern from the November 2026 audit. Not in this demo. This section does not record its own retest.
+
 Goal: searching a list never traps or interrupts the user.
 
 Pattern (AbCS Name List and main window Find):
@@ -768,6 +897,8 @@ Reference: AbCS `src/ui/name_list_window.py`, `src/ui/main_window.py` (Find dial
 
 ## 38. Tabbed windows
 
+**Status:** AbCS pattern from the November 2026 audit. Not in this demo. This section does not record its own retest.
+
 Goal: tab pages are as easy to move between as windows.
 
 Pattern (AbCS Preferences and Reading History):
@@ -780,6 +911,8 @@ Pattern (AbCS Preferences and Reading History):
 Reference: AbCS `src/ui/preferences_window.py`, `src/ui/reading_history_window.py`.
 
 ## 39. Long operations
+
+**Status:** AbCS 3.1 retest for the three confirmed items in this section. Not in this demo. The further items are AbCS patterns and do not each record a separate retest sentence.
 
 Goal: during a scan, import, or fetch, the progress window is what the user hears, and the keys keep working.
 
@@ -800,6 +933,8 @@ Reference: AbCS `src/ui/import_window.py`, `src/ui/import_progress_window.py`, `
 
 ## 40. Custom accessible interfaces and media
 
+**Status:** AbCS pattern from the November 2026 audit. Not in this demo. This section does not record its own retest.
+
 Goal: a control whose default spoken value is meaningless gets a useful one.
 
 Pattern (AbCS Listen window):
@@ -812,6 +947,8 @@ Pattern (AbCS Listen window):
 Reference: AbCS `src/ui/preview_window.py` (`ListenPositionSlider`, `_ListenPositionSliderAccessible`), `src/ui/web_fetch_progress.py`, `src/ui/preferences_window.py`.
 
 ## 41. Low vision, window placement, and platform notes
+
+**Status:** AbCS pattern from the November 2026 audit. Not in this demo. This section does not record its own retest.
 
 Low vision (AbCS):
 - Focus rings of 2 px `palette(highlight)` on inputs, buttons, spin boxes, sliders, and toolbar toggles; 3 px in high-contrast themes.
