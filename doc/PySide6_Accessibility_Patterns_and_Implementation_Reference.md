@@ -101,7 +101,21 @@ Pattern:
 - Use the shared message box helper for prompts (section 18).
 - Set clear dialog titles, text, and explicit button labels. Set accessible names and descriptions on the dialog and every control. Do not clear the dialog's name or description to reduce speech.
 - Return focus to the most relevant control after the dialog closes (section 24). After No on an unsaved-changes prompt, that control is the field the user was editing.
-- With focus in a text field, the read-dialog command reads the window title and that field. Put the dialog's instructions in the field's accessible description. Start focus on a button or combo when that command must read the whole dialog. AbCS does this on the read date and Recently Added dialogs.
+- Keep text fields out of small dialogs that must be read whole with the JAWS/NVDA command Insert+B (see below).
+
+### Text fields stop the JAWS/NVDA command Insert+B
+
+Once focus has been in a text field, JAWS and NVDA stop reading a Qt dialog with the JAWS/NVDA command Insert+B. Moving focus back to a button does not help: for the rest of that dialog's life, the command reads only the title and the focused control (JAWS says "paragraph" in the field). Before focus first enters a text field, the command reads the whole dialog.
+
+Tested in the Popup Tests tab (`popup_lab.py`) with JAWS and NVDA on Qt 6.12, November 2026:
+
+- **Fails:** a typed date (`QLineEdit`), a `QDateEdit`, an editable combo box, and a read-only `QLineEdit`, whenever focus enters them. Also fails with the field given its own native window (`WA_NativeWindow`), or reported to the screen reader as static text.
+- **No effect:** visible labels before the field, a dialog description, a status bar, the window icon, centering, and dropping the forced first focus.
+- **Works:** a dialog with a text field that focus never enters, and a date entered with three non-editable combo boxes (Year, Month, Day).
+
+Qt reports every `QDialog` to UI Automation as a dialog (`IsDialog`), whatever it holds. The whole Qt dialog is one native window, so the screen readers appear to treat the window as an edit window once they have tracked text input in it.
+
+For a small dialog that asks for a date, use Year, Month, and Day combo boxes. Typing digits jumps to a value. Because the JAWS/NVDA command Insert+B then reads the dialog, its instructions can go in visible text and Help instead of the field's accessible description.
 
 ### Default button and Enter
 
@@ -670,9 +684,9 @@ Pattern:
 - **Blank date.** Store blank as the minimum date and set a **non-empty** `specialValueText` (one space). An empty special value is ignored, and the screen reader reads "1752-09-14". Set it again after changing the maximum date. Add a Clear button, because the keyboard cannot clear a `QDateEdit`.
 - **Validation.** Beep, show a styled warning that quotes what was typed (or "(blank)"), keep the text, and put focus back on the field. Never restore an out-of-range stored value, or the warning repeats on every focus-out. A dialog's OK refuses to close on an invalid date.
 - **Prefilled typed field:** select all with `singleShot(0)` so typing replaces it.
-- **Instructions:** when a small dialog opens on a date field, put its instructions in the field's accessible description (section 5).
+- **Small date dialogs:** use Year, Month, and Day combo boxes instead of a typed or `QDateEdit` field. A text field stops the JAWS/NVDA command Insert+B from reading the dialog (section 5).
 
-Reference: AbCS `src/accessibility/masked_date_fields.py`, `src/ui/book_details.py`, `src/ui/main_window.py` (read date and Recently Added dialogs).
+Reference: AbCS `src/accessibility/masked_date_fields.py`, `src/ui/book_details.py`, `src/ui/main_window.py` (read date and Recently Added dialogs). Demo: `popup_lab.py` (`_DateCombos`, Popup Tests tab).
 
 ## 33. Read-only and noisy controls
 

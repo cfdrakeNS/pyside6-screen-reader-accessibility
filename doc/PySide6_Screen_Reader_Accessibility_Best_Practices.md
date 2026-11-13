@@ -102,7 +102,7 @@ When a dialog opens, screen readers must identify **that dialog** as the current
 - Use `AccessibleDialog` (`styled_dialogs.py`). The logical parent is used for Win32 ownership and z-order, but the Qt parent is `None`, so the dialog is a root in the MSAA/UIA tree.
 - Verify with the JAWS/NVDA command Insert+T after opening each major window and each F1 help popup. Insert+T and Insert+B are screen reader commands, not application shortcuts.
 - The JAWS/NVDA command Insert+B reads the dialog.
-- With focus in a text field, the read-dialog command reads the title and that field. Put the dialog's instructions in the field's accessible description, or start focus on a button or combo when the whole dialog must be read.
+- Once focus has been in a text field, the JAWS/NVDA command Insert+B reads only the title and the focused control, for the rest of that dialog's life. Keep text fields out of small dialogs that must be read whole; for a date, use Year, Month, and Day combo boxes (implementation reference section 5).
 - Exception: modeless utility windows with special z-order needs (for example AbCS `ImportProgressWindow`) may stay a standard `QDialog` with a Qt parent when `AccessibleDialog` would break their behavior.
 
 See implementation reference section 4.

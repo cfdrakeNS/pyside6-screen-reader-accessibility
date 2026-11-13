@@ -11,11 +11,13 @@ from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
+    QCheckBox,
     QComboBox,
     QFormLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
     QMessageBox,
     QPushButton,
     QStatusBar,
@@ -44,6 +46,7 @@ from accessibility_patterns import (
     set_accessible_table_rows,
     validate_year_field,
 )
+from popup_lab import POPUP_VARIANTS, exec_popup_variant, set_date_fields_as_plain_text
 from styled_dialogs import AccessibleDialog, exec_shortcuts_dialog, show_styled_message_box
 
 _CONTEXT_HELP = {
@@ -128,7 +131,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
     shadowed by Qt's QObject implementation.
     """
 
-    ALLOWED_ALT_KEYS = ("T", "C", "Y", "L", "D", "I", "P")
+    ALLOWED_ALT_KEYS = ("T", "C", "Y", "L", "D", "I", "P", "U")
 
     def __init__(self, parent=None, window_title="Accessible Sample"):
         super().__init__(parent, title=window_title)
@@ -142,6 +145,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
 
         self._build_form_tab()
         self._build_text_tab()
+        self._build_popup_tests_tab()
 
         self.status_bar = QStatusBar()
         self.status_bar.setSizeGripEnabled(False)
@@ -294,6 +298,66 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
 
         self.tabs.addTab(tab, "Text Review")
 
+    def _build_popup_tests_tab(self):
+        self.popup_tests_tab = QWidget()
+        layout = QVBoxLayout(self.popup_tests_tab)
+
+        list_label = QLabel("Popup tests:")
+        self.popup_list = QListWidget()
+        self.popup_list.setAccessibleName("Popup tests")
+        self.popup_list.setAccessibleDescription("Test popups for the JAWS/NVDA command Insert+B - Alt+U")
+        for variant in POPUP_VARIANTS:
+            self.popup_list.addItem(variant.heading)
+        self.popup_list.setCurrentRow(0)
+        self.popup_list.itemActivated.connect(lambda _item: self.on_open_popup_test())
+        list_label.setBuddy(self.popup_list)
+        layout.addWidget(list_label)
+        layout.addWidget(self.popup_list)
+
+        self.plain_text_check = QCheckBox("Report date fields as plain text")
+        self.plain_text_check.setAccessibleName("Report date fields as plain text")
+        self.plain_text_check.toggled.connect(self._on_plain_text_toggled)
+        layout.addWidget(self.plain_text_check)
+
+        button_layout = QHBoxLayout()
+        self.open_popup_button = QPushButton("Open")
+        self.open_popup_button.setAccessibleName("Open popup test")
+        apply_tooltip_accessibility(
+            self.open_popup_button,
+            "Open the selected test popup",
+            "Open the popup selected in the Popup tests list",
+        )
+        self.open_popup_button.setAutoDefault(False)
+        self.open_popup_button.setDefault(False)
+        self.open_popup_button.clicked.connect(self.on_open_popup_test)
+        button_layout.addWidget(self.open_popup_button)
+        button_layout.addStretch()
+        layout.addLayout(button_layout)
+
+        self.tabs.addTab(self.popup_tests_tab, "Popup Tests")
+
+    def _on_plain_text_toggled(self, checked: bool):
+        set_date_fields_as_plain_text(checked)
+        self.set_status(
+            "Date fields will be reported as plain text"
+            if checked
+            else "Date fields will be reported as edit fields"
+        )
+
+    def focus_popup_tests(self):
+        self.tabs.setCurrentWidget(self.popup_tests_tab)
+        self.popup_list.setFocus()
+
+    def on_open_popup_test(self):
+        row = self.popup_list.currentRow()
+        if row < 0:
+            self.set_status("Select a popup test first", announce=True)
+            self.popup_list.setFocus()
+            return
+        message = exec_popup_variant(self, POPUP_VARIANTS[row])
+        self.popup_list.setFocus()
+        self.set_status(message, announce=True)
+
     def _on_table_selection_changed(self):
         # Status text only: a focus-pulse announce on every arrow key pulls
         # focus out of the table, and JAWS/NVDA re-enters it reading coordinates.
@@ -374,6 +438,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
             ("Alt+D", self.on_delete),
             ("Alt+I", self.on_open_info_dialog),
             ("Alt+P", lambda: self.plot_list.setFocus()),
+            ("Alt+U", self.focus_popup_tests),
         ):
             shortcut = QShortcut(QKeySequence(seq), self)
             shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
@@ -404,6 +469,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
                 ("Alt+D", "Delete selected"),
                 ("Alt+I", "Open info dialog"),
                 ("Alt+P", "Plot"),
+                ("Alt+U", "Popup tests"),
                 ("Alt+Down", "Open category list"),
                 ("Escape", "Close window with confirmation"),
             ],

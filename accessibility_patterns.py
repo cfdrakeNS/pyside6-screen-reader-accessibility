@@ -11,19 +11,20 @@ import html as html_module
 import re
 import time
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import date, datetime
 
 try:
     import psutil
 except ImportError:
     psutil = None
 
-from PySide6.QtCore import QEvent, QSize, Qt, QTimer
+from PySide6.QtCore import QDate, QEvent, QSize, Qt, QTimer
 from PySide6.QtGui import QAccessible, QAccessibleEvent, QFontMetricsF, QPalette
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QComboBox,
+    QDateEdit,
     QDialog,
     QFrame,
     QLineEdit,
@@ -518,6 +519,136 @@ def validate_year_field(field, parent) -> bool:
         return True
     try:
         field.validated_year()
+        return True
+    except ValueError:
+        QApplication.beep()
+        exec_styled_message_box(
+            parent,
+            icon=QMessageBox.Icon.Warning,
+            title="Invalid Entry",
+            text=field.invalid_message(),
+        )
+        field.setFocus()
+        return False
+
+
+DATE_DISPLAY = "yyyy-MM-dd"
+DATE_PLACEHOLDER = "yyyy-MM-dd"
+MIN_DATE = QDate(1752, 9, 14)
+
+
+def parse_iso_date_text(text: str) -> date | None:
+    """Return a date from yyyy-MM-dd (or yyyyMMdd) text, None when blank, or raise ValueError."""
+    raw = (text or "").strip().replace(" ", "")
+    if not raw:
+        return None
+    if len(raw) == 8 and raw.isdigit():
+        raw = f"{raw[:4]}-{raw[4:6]}-{raw[6:8]}"
+    elif not (len(raw) == 10 and raw[4] == "-" and raw[7] == "-"):
+        raise ValueError("incomplete")
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d").date()
+    except ValueError as exc:
+        raise ValueError("invalid") from exc
+
+
+def date_invalid_message(entered: str, *, allow_blank: bool = True) -> str:
+    shown = (entered or "").strip() or "(blank)"
+    blank_note = ", or leave blank" if allow_blank else ""
+    return f"Date '{shown}' is not valid. Enter a date as year-month-day{blank_note}."
+
+
+def date_future_message(entered: str) -> str:
+    shown = (entered or "").strip() or "(blank)"
+    return f"Date '{shown}' is in the future. Enter today or an earlier date."
+
+
+class MaskedDateEdit(QLineEdit):
+    """Typed yyyy-MM-dd date for screen reader users (section 32).
+
+    A QDateEdit reads one segment at a time and changes the value with Up and
+    Down; a plain text field reads the typed date back as a whole.
+    """
+
+    def __init__(self, parent=None, *, allow_blank: bool = True, disallow_future: bool = True):
+        super().__init__(parent)
+        self._allow_blank = allow_blank
+        self._disallow_future = disallow_future
+        self.setPlaceholderText(DATE_PLACEHOLDER)
+        self.setMaxLength(10)
+        self.setMaximumWidth(150)
+        self.setClearButtonEnabled(False)
+        self.setAccessibleName("Date")
+        blank_note = "or leave blank. " if allow_blank else ""
+        future_note = "Must be today or earlier. " if disallow_future else ""
+        self.setAccessibleDescription(
+            f"Type a date as year dash month dash day, {blank_note}{future_note}"
+            "Invalid values show a message when you confirm."
+        )
+
+    def focusInEvent(self, event):
+        super().focusInEvent(event)
+        QTimer.singleShot(0, self._place_cursor_for_typing)
+
+    def _place_cursor_for_typing(self) -> None:
+        if not self.hasFocus():
+            return
+        self.deselect()
+        self.setCursorPosition(0)
+
+    def setDate(self, qdate: QDate) -> None:
+        self.setText(qdate.toString(DATE_DISPLAY) if qdate and qdate.isValid() else "")
+
+    def validated_date(self) -> date | None:
+        """Return the date, None when blank and allowed, or raise ValueError."""
+        parsed = parse_iso_date_text(self.text())
+        if parsed is None:
+            if self._allow_blank:
+                return None
+            raise ValueError("blank")
+        if parsed < MIN_DATE.toPython():
+            raise ValueError("invalid")
+        if self._disallow_future and parsed > date.today():
+            raise ValueError("future")
+        return parsed
+
+    def invalid_message(self) -> str:
+        try:
+            self.validated_date()
+        except ValueError as exc:
+            if str(exc) == "future":
+                return date_future_message(self.text())
+        return date_invalid_message(self.text(), allow_blank=self._allow_blank)
+
+
+def configure_classic_date_field(field: QDateEdit, *, disallow_future: bool = True) -> QDateEdit:
+    """Give a QDateEdit a calendar popup (Alt+Down opens it) and the yyyy-MM-dd format."""
+    field.setCalendarPopup(True)
+    field.setDisplayFormat(DATE_DISPLAY)
+    field.setMinimumDate(MIN_DATE)
+    if disallow_future:
+        field.setMaximumDate(QDate.currentDate())
+    return field
+
+
+def make_classic_date_field(parent=None, *, disallow_future: bool = True) -> QDateEdit:
+    """QDateEdit with a calendar popup (Alt+Down opens it)."""
+    return configure_classic_date_field(QDateEdit(parent), disallow_future=disallow_future)
+
+
+def make_date_field(parent=None, *, allow_blank: bool = True, disallow_future: bool = True):
+    """Date field: typed MaskedDateEdit when a screen reader is active, else QDateEdit (section 32)."""
+    if is_screen_reader_active():
+        return MaskedDateEdit(parent, allow_blank=allow_blank, disallow_future=disallow_future)
+    return make_classic_date_field(parent, disallow_future=disallow_future)
+
+
+def validate_date_field(field, parent) -> bool:
+    """Return True when the date is valid; otherwise beep, warn, and focus the field."""
+    if not isinstance(field, MaskedDateEdit):
+        return True
+    try:
+        field.validated_date()
         return True
     except ValueError:
         QApplication.beep()

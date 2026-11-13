@@ -39,6 +39,7 @@ python main.py
 | `main.py` | Demo window (`AccessibleSampleWindow`, `InfoDialog`) |
 | `accessibility_patterns.py` | `AccessibilityMixin` and helper functions |
 | `styled_dialogs.py` | `AccessibleDialog`, F1 shortcut dialog, and styled message boxes |
+| `popup_lab.py` | Popup Tests tab: copies of AbCS popups for testing the JAWS/NVDA command Insert+B |
 | `doc/PySide6_Accessibility_Patterns_and_Implementation_Reference.md` | Code patterns (section numbers below) |
 | `doc/PySide6_Screen_Reader_Accessibility_Best_Practices.md` | Design principles |
 | `doc/AbCS_Standards_Crosswalk.md` | AbCS standard rule to section and demo code |
@@ -81,7 +82,20 @@ Sections 14 and 15 (screen reader detection, QAccessible startup) are in `access
 - **Alt+D** — delete
 - **Alt+I** — open the info dialog
 - **Alt+P** — plot list
+- **Alt+U** — Popup tests list
 - **Alt+Down** — open the category list
+
+## Popup tests
+
+The Popup Tests tab investigates an AbCS problem: the JAWS/NVDA command Insert+B reads the Duplicate Check popup as a dialog, but not the Read date or Recently Added popups. The list holds copies of those three popups and variants that each change one thing, such as the field type, a visible prompt, or the first focus.
+
+1. Run `python main.py` from a terminal, press Alt+U, choose a popup, and press Enter.
+2. Without pressing Tab, use the JAWS/NVDA command Insert+B, then Insert+T. Note what is read.
+3. One second after the popup opens, the terminal shows its accessibility tree: each control's role and name, the focused control, and the window details.
+
+The "Report date fields as plain text" checkbox makes popups opened afterward report their date field as static text instead of an edit field. It tests whether the edit field itself is what stops Insert+B.
+
+Result (JAWS and NVDA, November 2026): once focus has been in any text field, Insert+B stops reading the dialog. Popup 19, with Year, Month, and Day combo boxes, works throughout. See implementation reference section 5.
 
 ## Validation
 
