@@ -98,4 +98,4 @@ Before changing a pattern, run the manual JAWS/NVDA check in implementation refe
 
 ## License
 
-See [LICENSE](LICENSE). Non-commercial use; contact copyright holder for commercial licensing.
+MIT No Attribution (MIT-0). See [LICENSE](LICENSE). Copy the helpers and patterns into any project, including commercial ones; no credit or notice is required.
