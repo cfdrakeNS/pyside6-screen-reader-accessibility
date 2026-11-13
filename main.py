@@ -35,6 +35,7 @@ from accessibility_patterns import (
     apply_tooltip_accessibility,
     configure_table,
     create_accessible_read_only_text,
+    select_first_cell_when_focused,
     create_dialog_html_text,
     fit_dialog_width_to_text,
     init_app_accessibility,
@@ -67,13 +68,13 @@ class InfoDialog(AccessibleDialog):
                 ("item", "It should not read the title of the window behind it."),
                 ("item", "Up and Down arrows read this text one line at a time."),
                 ("item", "Test message box opens a box over this dialog."),
-                ("item", "JAWS should not say Sample Info Dialog unavailable first."),
+                ("item", "JAWS/NVDA should not say Sample Info Dialog unavailable first."),
                 ("item", "In the message box, Insert+B reads the whole box."),
                 ("item", "Tab moves to the Test message box and Close buttons."),
                 ("heading", "HOW THIS TEXT IS BUILT"),
                 ("body", "Each heading, line, and list item is its own paragraph."),
                 ("body", "The dialog is sized so no paragraph wraps."),
-                ("body", "JAWS rereads a wrapped line as you arrow up and down."),
+                ("body", "JAWS/NVDA rereads a wrapped line as you arrow up and down."),
             ],
             "Info text",
             "Sample information. Use arrow keys to read line by line. "
@@ -127,7 +128,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
     shadowed by Qt's QObject implementation.
     """
 
-    ALLOWED_ALT_KEYS = ("T", "C", "Y", "I", "L", "S", "D", "O", "P")
+    ALLOWED_ALT_KEYS = ("T", "C", "Y", "L", "D", "I", "P")
 
     def __init__(self, parent=None, window_title="Accessible Sample"):
         super().__init__(parent, title=window_title)
@@ -210,6 +211,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
         self.items_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.items_table.setTabKeyNavigation(False)
         configure_table(self.items_table)
+        select_first_cell_when_focused(self.items_table)
         self.items_table.keyPressEvent = make_accessible_table_key_press(self.items_table, self)
         self.items_table.itemSelectionChanged.connect(self._on_table_selection_changed)
 
@@ -294,7 +296,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
 
     def _on_table_selection_changed(self):
         # Status text only: a focus-pulse announce on every arrow key pulls
-        # focus out of the table, and JAWS re-enters it reading coordinates.
+        # focus out of the table, and JAWS/NVDA re-enters it reading coordinates.
         # The cell's AccessibleTextRole already speaks the row; Alt+/ reads this.
         row = self.items_table.currentRow()
         if row < 0:
@@ -368,11 +370,9 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
             ("Alt+T", lambda: self.title_edit.setFocus()),
             ("Alt+C", lambda: self.category_combo.setFocus()),
             ("Alt+Y", lambda: self.year_field.setFocus()),
-            ("Alt+I", lambda: self.items_table.setFocus()),
             ("Alt+L", lambda: self.items_table.setFocus()),
-            ("Alt+S", lambda: self.save_button.setFocus()),
-            ("Alt+D", lambda: self.delete_button.setFocus()),
-            ("Alt+O", self.on_open_info_dialog),
+            ("Alt+D", self.on_delete),
+            ("Alt+I", self.on_open_info_dialog),
             ("Alt+P", lambda: self.plot_list.setFocus()),
         ):
             shortcut = QShortcut(QKeySequence(seq), self)
@@ -400,10 +400,9 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
                 ("Alt+T", "Title field"),
                 ("Alt+C", "Category field"),
                 ("Alt+Y", "Year field"),
-                ("Alt+I or Alt+L", "Items table"),
-                ("Alt+S", "Save button"),
-                ("Alt+D", "Delete button"),
-                ("Alt+O", "Open info dialog"),
+                ("Alt+L", "Items table"),
+                ("Alt+D", "Delete"),
+                ("Alt+I", "Open info dialog"),
                 ("Alt+P", "Plot list"),
                 ("Alt+Down", "Open category list"),
                 ("Escape", "Close window with confirmation"),

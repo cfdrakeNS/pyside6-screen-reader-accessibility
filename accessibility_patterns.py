@@ -707,6 +707,37 @@ def set_accessible_table_rows(table: QTableWidget, rows) -> None:
             table.setItem(row, column, item)
 
 
+def select_first_cell_when_focused(table: QTableWidget) -> None:
+    """Highlight the first cell when focus enters a table with no selection.
+
+    Tabbing into a table that has no current index focuses the widget and
+    shows no highlight. ``setCurrentCell`` during ``focusInEvent`` sets the
+    current index and leaves the selection empty, so the highlight is applied
+    on the next event-loop turn. A later visit keeps the cell already chosen.
+    """
+
+    def focus_in(event):
+        QTableWidget.focusInEvent(table, event)
+        if table.rowCount() <= 0:
+            return
+        selection = table.selectionModel()
+        if selection is not None and selection.hasSelection():
+            return
+        row = 0 if table.currentRow() < 0 else table.currentRow()
+
+        def select():
+            if row >= table.rowCount():
+                return
+            model = table.selectionModel()
+            if model is not None and model.hasSelection():
+                return
+            table.setCurrentCell(row, 0)
+
+        QTimer.singleShot(0, select)
+
+    table.focusInEvent = focus_in
+
+
 def make_accessible_table_key_press(table: QTableWidget, parent: QWidget):
     """Return a keyPressEvent handler where Tab exits the table (section 22)."""
 
@@ -847,7 +878,7 @@ class AccessibilityMixin:
     Subclasses should call init_accessibility() after creating a status bar.
     """
 
-    ALLOWED_ALT_KEYS: tuple[str, ...] = ("T", "C", "Y", "I", "L", "S", "D")
+    ALLOWED_ALT_KEYS: tuple[str, ...] = ("T", "C", "Y", "L", "D", "I")
 
     def init_accessibility(self) -> None:
         """Wire status bar, event filters, and screen reader detection."""

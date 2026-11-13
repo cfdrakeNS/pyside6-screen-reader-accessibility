@@ -131,7 +131,7 @@ Goal: prevent conflicts and keep shortcut behavior predictable.
 Pattern:
 - **F1**, **Shift+F1**, **Escape**, and **Alt+/** are always local `QShortcut`s on each window, even in an application that centralizes other shortcuts. Each window needs its own help, close, and status behavior.
 - Alt+letter field shortcuts may be registered locally (as in this demo) or through a central shortcut manager in larger applications. Either way, keep the window's `ALLOWED_ALT_KEYS` in sync (section 3).
-- Use one save shortcut everywhere: **Ctrl+S** runs Save. In this demo, Alt+S only moves focus to the Save button.
+- Use one save shortcut everywhere: **Ctrl+S** runs Save. Do not also bind Alt+S to the Save button. AbCS does the same: Save is Ctrl+S in every window that has a Save button.
 - Use `Qt.ShortcutContext.WidgetWithChildrenShortcut` so a window's shortcuts do not fire in other windows.
 - Do not bind global Enter/Return shortcuts. They steal default-button activation.
 
@@ -191,10 +191,14 @@ Goal: JAWS and NVDA read each cell's content, not row numbers or cell coordinate
 
 **Selection visibility.** `configure_table` also applies `build_accessible_table_style()`, which gives the selected cell a solid `palette(highlight)` fill with `palette(highlighted-text)` and no hover change. `keep_selection_visible_when_inactive(table)` copies the active highlight colors into the inactive palette group, so the selection stays visible after Tab leaves the table.
 
-**Behavior.** For label/value tables, use row selection, single selection, no editing, and `setTabKeyNavigation(False)`. Turn off mouse tracking and hover on the table and viewport (done by `configure_table`).
+**Behavior.** For label/value tables, use row selection, single selection, no editing, and `setTabKeyNavigation(False)`. Turn off mouse tracking and hover on the table and viewport (done by `configure_table`). Call `select_first_cell_when_focused(table)` so the first cell is highlighted when focus enters a table that has no current cell. A later visit keeps the cell the user already chose.
 
 ```python
-from accessibility_patterns import configure_table, set_accessible_table_rows
+from accessibility_patterns import (
+    configure_table,
+    select_first_cell_when_focused,
+    set_accessible_table_rows,
+)
 
 table = QTableWidget(0, 2)
 table.setHorizontalHeaderLabels(["Name", "Value"])
@@ -204,6 +208,7 @@ table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
 table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
 table.setTabKeyNavigation(False)
 configure_table(table)
+select_first_cell_when_focused(table)
 ```
 
 Model-backed tables (`QTableView` with a `QAbstractTableModel`) follow the same rules. Return text for `Qt.AccessibleTextRole` from `data()` for every column, and return `""` from `headerData()` for the vertical orientation.
@@ -212,7 +217,7 @@ Do not announce the row through the status bar on every arrow key (section 21).
 
 **AbCS production.** The AbCS Statistics table (`statistics_dialog.py`) uses the same label/value text on both cells and the same disabled header. The main book table (`BookTableModel` in `main_window.py`) returns `AccessibleTextRole` for every column. Selecting many rows uses one selection range per run of consecutive rows (`rows_to_selection` in `table_selection.py`), not one range per cell.
 
-Reference: `accessibility_patterns.py` (`configure_table`, `set_accessible_table_rows`, `build_accessible_table_style`, `keep_selection_visible_when_inactive`), `main.py` (`AccessibleSampleWindow._build_form_tab`).
+Reference: `accessibility_patterns.py` (`configure_table`, `select_first_cell_when_focused`, `set_accessible_table_rows`, `build_accessible_table_style`, `keep_selection_visible_when_inactive`), `main.py` (`AccessibleSampleWindow._build_form_tab`).
 
 ## 10. About/Info dialog pattern
 

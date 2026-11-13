@@ -77,9 +77,9 @@ Sections 14 and 15 (screen reader detection, QAccessible startup) are in `access
 - **Ctrl+S** — save
 - **Escape** — close with confirmation
 - **Alt+T/C/Y** — Title, Category, Year fields
-- **Alt+I** or **Alt+L** — Items table
-- **Alt+S/D** — Save and Delete buttons
-- **Alt+O** — open the info dialog
+- **Alt+L** — Items table
+- **Alt+D** — delete
+- **Alt+I** — open the info dialog
 - **Alt+P** — plot list
 - **Alt+Down** — open the category list
 
