@@ -20,6 +20,8 @@ Every major action must be reachable by keyboard.
 Always define meaningful names and descriptions for important controls, groups, and dialogs.
 - Name: what this control is.
 - Description: what this control does or how to use it.
+- Leave the control type out of the name. The screen reader already says "button", "edit", "table", or "tab", so "Save button" is read as "Save button, button". Name a field after its label ("Year", not "Year field").
+- End the description with the control's shortcut, after a dash: "Save changes - Ctrl+S".
 - Keep names and descriptions on dialogs too; do not clear them to reduce speech.
 - `QAction` menu items are named by their menu text; do not set an accessible name on them.
 - An image that carries information takes focus and has a spoken name; a decorative image does not take focus.

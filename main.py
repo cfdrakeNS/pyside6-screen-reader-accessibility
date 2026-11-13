@@ -85,7 +85,7 @@ class InfoDialog(AccessibleDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         self.test_button = QPushButton("Test message box")
-        self.test_button.setAccessibleName("Test message box button")
+        self.test_button.setAccessibleName("Test message box")
         self.test_button.setAccessibleDescription(
             "Show a message box over this dialog to check that the dialog is not read as unavailable"
         )
@@ -93,7 +93,7 @@ class InfoDialog(AccessibleDialog):
         button_layout.addWidget(self.test_button)
 
         self.close_button = QPushButton("Close")
-        self.close_button.setAccessibleName("Close button")
+        self.close_button.setAccessibleName("Close")
         self.close_button.setDefault(True)
         self.close_button.clicked.connect(self.accept)
         button_layout.addWidget(self.close_button)
@@ -137,7 +137,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
 
         layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
-        self.tabs.setAccessibleName("Demo tabs")
+        self.tabs.setAccessibleName("Demo sections")
         layout.addWidget(self.tabs)
 
         self._build_form_tab()
@@ -172,7 +172,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
 
         title_label = QLabel("&Title:")
         self.title_edit = QLineEdit()
-        self.title_edit.setAccessibleName("Title field")
+        self.title_edit.setAccessibleName("Title")
         self.title_edit.setAccessibleDescription("Enter the title here")
         title_label.setBuddy(self.title_edit)
         form.addRow(title_label, self.title_edit)
@@ -181,7 +181,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
         self.category_combo = QComboBox()
         self.category_combo.setEditable(True)
         self.category_combo.addItems(["Fiction", "Non-Fiction", "Technical"])
-        self.category_combo.setAccessibleName("Category field")
+        self.category_combo.setAccessibleName("Category")
         self.category_combo.setAccessibleDescription("Select or type a category")
         category_label.setBuddy(self.category_combo)
         form.addRow(category_label, self.category_combo)
@@ -189,7 +189,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
         year_label = QLabel("&Year:")
         self.year_field = make_year_field(self)
         self.year_field.setValue(datetime.now().year)
-        self.year_field.setAccessibleName("Year field")
+        self.year_field.setAccessibleName("Year")
         year_label.setBuddy(self.year_field)
         form.addRow(year_label, self.year_field)
 
@@ -202,7 +202,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
             self.items_table,
             [("Item 1", "100"), ("Item 2", "200"), ("Item 3", "300")],
         )
-        self.items_table.setAccessibleName("Items table")
+        self.items_table.setAccessibleName("Items")
         self.items_table.setAccessibleDescription(
             "Table showing item names and values. Each row reads the name and value together."
         )
@@ -220,31 +220,31 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
 
         button_layout = QHBoxLayout()
         self.save_button = QPushButton("Save")
-        self.save_button.setAccessibleName("Save button")
+        self.save_button.setAccessibleName("Save")
         apply_tooltip_accessibility(
             self.save_button,
             "Save current data",
-            "Save the current title and category",
+            "Save the current title and category - Ctrl+S",
         )
         self.save_button.clicked.connect(self.on_save)
         button_layout.addWidget(self.save_button)
 
         self.delete_button = QPushButton("Delete")
-        self.delete_button.setAccessibleName("Delete button")
+        self.delete_button.setAccessibleName("Delete")
         apply_tooltip_accessibility(
             self.delete_button,
             "Delete selected row",
-            "Delete the selected item from the table",
+            "Delete the selected item from the table - Alt+D",
         )
         self.delete_button.clicked.connect(self.on_delete)
         button_layout.addWidget(self.delete_button)
 
         self.info_button = QPushButton("Info Dialog")
-        self.info_button.setAccessibleName("Info dialog button")
+        self.info_button.setAccessibleName("Info dialog")
         apply_tooltip_accessibility(
             self.info_button,
             "Open info dialog",
-            "Open a sample dialog. The JAWS/NVDA command Insert+T reads the title",
+            "Open a sample dialog - Alt+I. The JAWS/NVDA command Insert+T reads the title",
         )
         self.info_button.clicked.connect(self.on_open_info_dialog)
         button_layout.addWidget(self.info_button)
@@ -393,17 +393,17 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
             self,
             "Keyboard Shortcuts - Accessible Sample",
             [
-                ("F1", "Show this help"),
+                ("F1", "Show keyboard shortcuts"),
                 ("Shift+F1", "Context help"),
-                ("Alt+/", "Read status"),
+                ("Alt+/", "Read status bar"),
                 ("Ctrl+S", "Save"),
-                ("Alt+T", "Title field"),
-                ("Alt+C", "Category field"),
-                ("Alt+Y", "Year field"),
-                ("Alt+L", "Items table"),
-                ("Alt+D", "Delete"),
+                ("Alt+T", "Title"),
+                ("Alt+C", "Category"),
+                ("Alt+Y", "Year"),
+                ("Alt+L", "Jump to list"),
+                ("Alt+D", "Delete selected"),
                 ("Alt+I", "Open info dialog"),
-                ("Alt+P", "Plot list"),
+                ("Alt+P", "Plot"),
                 ("Alt+Down", "Open category list"),
                 ("Escape", "Close window with confirmation"),
             ],

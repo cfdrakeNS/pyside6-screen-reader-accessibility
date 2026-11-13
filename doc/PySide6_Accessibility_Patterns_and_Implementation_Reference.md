@@ -551,7 +551,7 @@ Before saving, call `validate_year_field(field, parent)`. For the typed field, i
 ```python
 self.year_field = make_year_field(self)
 self.year_field.setValue(datetime.now().year)
-self.year_field.setAccessibleName("Year field")
+self.year_field.setAccessibleName("Year")
 
 # in on_save
 if not validate_year_field(self.year_field, self):
