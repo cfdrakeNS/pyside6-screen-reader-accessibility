@@ -50,7 +50,7 @@ python main.py
 | 1 | Status bar announce and Alt+/ readback | `announce_status_message`, `AccessibilityMixin.set_status` |
 | 2 | Editable combo anti-noise | `AccessibilityMixin.eventFilter` |
 | 3 | Alt+letter hygiene | `is_unmapped_alt_letter` |
-| 4 | AccessibleDialog (Insert+T reads the right title) | `styled_dialogs.AccessibleDialog` |
+| 4 | AccessibleDialog (JAWS/NVDA command Insert+T reads the right title) | `styled_dialogs.AccessibleDialog` |
 | 5 | Default button only for one main action; Enter clicks the focused button in forms | `InfoDialog`, `AccessibleSampleWindow.keyPressEvent` |
 | 6 | Local F1, Escape, Alt+/ shortcuts; Ctrl+S Save | `AccessibleSampleWindow.setup_shortcuts` |
 | 7 | F1 help as a one-column table dialog | `exec_shortcuts_dialog` |
@@ -85,7 +85,7 @@ Sections 14 and 15 (screen reader detection, QAccessible startup) are in `access
 
 ## Validation
 
-Before changing a pattern, run the manual JAWS/NVDA check in implementation reference section 29: names on Tab, keyboard-only actions, Alt+/, focus after each dialog and message box, Insert+T titles, no "unavailable" before a box, tables read content, dialog text read once per line, value fields speak the new value, and Escape runs the same check as the close box.
+Before changing a pattern, run the manual JAWS/NVDA check in implementation reference section 29: names on Tab, keyboard-only actions, Alt+/, focus after each dialog and message box, the JAWS/NVDA command Insert+T for titles, no "unavailable" before a box, tables read content, dialog text read once per line, value fields speak the new value, and Escape runs the same check as the close box.
 
 ## Using as a reference
 

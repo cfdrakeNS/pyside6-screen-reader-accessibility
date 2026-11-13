@@ -52,13 +52,13 @@ Pattern:
 
 Reference: `accessibility_patterns.py` (`is_unmapped_alt_letter`, `AccessibilityMixin.eventFilter`), `main.py` (`AccessibleSampleWindow.ALLOWED_ALT_KEYS`).
 
-## 4. AccessibleDialog window title pattern (JAWS Insert+T)
+## 4. AccessibleDialog window title pattern (JAWS/NVDA command Insert+T)
 
 Goal: ensure screen readers read the **active dialog title**, not the window behind it.
 
 ### Problem
 
-Qt's MSAA/UIA bridge exposes `QDialog(parent=X)` as an accessibility **child** of `X`. JAWS Insert+T walks up the tree from the focused control:
+Qt's MSAA/UIA bridge exposes `QDialog(parent=X)` as an accessibility **child** of `X`. The JAWS/NVDA command Insert+T walks up the tree from the focused control:
 
 `focused_control → … → DialogWindow → MainWindow`
 
@@ -71,7 +71,7 @@ All feature dialogs and inline help/popup dialogs inherit from `AccessibleDialog
 Pattern:
 - Pass the logical owner as `parent` to `AccessibleDialog(parent, title=...)`. The base class stores it as `owner_widget` but calls `QDialog.__init__(None)`, so the dialog is a **root** in the accessibility tree.
 - On Windows, set the Win32 **owner** via `SetWindowLongPtrW(GWL_HWNDPARENT)` (`_set_win32_owner`) so taskbar grouping and z-order still follow the calling window, without creating an accessibility parent chain.
-- On `showEvent`, re-fire focus so JAWS registers the new window before Insert+T is used. The delay is 100 ms on Qt 6.11 and later and 300 ms on older Qt (`_focus_refire_delay_ms`). Qt 6.11 improved MSAA/UIA window and focus registration on Windows.
+- On `showEvent`, re-fire focus so the new window is registered before the JAWS/NVDA command Insert+T is used. The delay is 100 ms on Qt 6.11 and later and 300 ms on older Qt (`_focus_refire_delay_ms`). Qt 6.11 improved MSAA/UIA window and focus registration on Windows. That command reads the window title. It is not an application shortcut.
 - Subclasses that override `showEvent` must call `super().showEvent(event)`. Subclasses that override `done()` must call `super().done(r)`.
 - When a window also uses `AccessibilityMixin`, inherit as `class MyWindow(AccessibilityMixin, AccessibleDialog)` (section 2).
 - Modeless utility windows that use `AccessibleDialog` may set `self._announce_focus_on_show = False` in `__init__` to skip the focus refire when repeated `show()` calls would steal focus.
@@ -144,7 +144,7 @@ Reference: `main.py` (`AccessibleSampleWindow.setup_shortcuts`).
 Goal: provide a stable, readable shortcut list.
 
 Pattern:
-- Show the list in an `AccessibleDialog`, so Insert+T reads the help title (section 4).
+- Show the list in an `AccessibleDialog`, so the JAWS/NVDA command Insert+T reads the help title (section 4).
 - Use a one-column read-only `QTableWidget`. Hide both headers, turn off the grid and hover, and set `setTabKeyNavigation(False)`.
 - Each row's display text is `"action - key"`. Its `AccessibleTextRole` is `"action: key"`.
 - Select the first row and put focus on the table when the dialog opens. Escape closes the dialog.
@@ -232,7 +232,7 @@ Pattern:
 - Set a **short** accessible name and a helpful accessible description on the text area.
 - Set first focus to the text area in `showEvent` with `QTimer.singleShot(0, ...)` (section 23).
 - Make the dialog modal and return focus to the opening control after it closes (section 24).
-- Verify with JAWS Insert+T that the dialog title is read.
+- Verify with the JAWS/NVDA command Insert+T that the dialog title is read. This is a screen reader command, not an application shortcut.
 
 ```python
 def on_open_info_dialog(self):
@@ -268,7 +268,7 @@ self.body = create_dialog_html_text(
     [
         ("body", "This dialog is an accessibility root window."),
         ("heading", "WHAT TO CHECK"),
-        ("item", "Insert+T reads the window title: Sample Info Dialog."),
+        ("item", "The JAWS/NVDA command Insert+T reads the window title: Sample Info Dialog."),
     ],
     "Info text",  # short name only, never the full body
     "Sample information. Use arrow keys to read line by line. Press Tab to move to the buttons.",
@@ -608,8 +608,8 @@ Before marking a UI change done, test with at least one screen reader, and with 
 2. Activate the primary action and Cancel/Close with the keyboard only, including any Alt+letter shortcut.
 3. Alt+/ reads the latest status after a meaningful action.
 4. Focus returns to a sensible place after each dialog or message box closes.
-5. Insert+T reads the new window's title, not the window behind it. Only the new window is spoken when it opens.
-6. A confirm or validation box over a dialog is not preceded by "<title> unavailable". Insert+B reads the box.
+5. The JAWS/NVDA command Insert+T reads the new window's title, not the window behind it. Only the new window is spoken when it opens.
+6. A confirm or validation box over a dialog is not preceded by "<title> unavailable". The JAWS/NVDA command Insert+B reads the dialog.
 7. Arrowing through a table reads cell content, not coordinates or row numbers.
 8. Arrowing through dialog text reads each line once, with no repeated wrapped lines.
 9. Up or Down on a year or date field speaks the new value. Arrowing a table or list does not fire a status announcement for that move.

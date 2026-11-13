@@ -92,13 +92,14 @@ After save, delete, import, cancel, or any dialog or message box:
 
 See implementation reference section 24.
 
-## 11. Dialog windows must be accessibility roots (Insert+T)
+## 11. Dialog windows must be accessibility roots (JAWS/NVDA command Insert+T)
 
 When a dialog opens, screen readers must identify **that dialog** as the current window, not the window behind it.
 
-- Do not use `QDialog(parent=mainWindow)` for feature dialogs. Qt exposes it as an accessibility child of the parent, so JAWS Insert+T reads the parent's title.
+- Do not use `QDialog(parent=mainWindow)` for feature dialogs. Qt exposes it as an accessibility child of the parent, so the JAWS/NVDA command Insert+T reads the parent's title.
 - Use `AccessibleDialog` (`styled_dialogs.py`). The logical parent is used for Win32 ownership and z-order, but the Qt parent is `None`, so the dialog is a root in the MSAA/UIA tree.
-- Verify with JAWS Insert+T after opening each major window and each F1 help popup.
+- Verify with the JAWS/NVDA command Insert+T after opening each major window and each F1 help popup. Insert+T and Insert+B are screen reader commands, not application shortcuts.
+- The JAWS/NVDA command Insert+B reads the dialog.
 - With focus in a text field, the read-dialog command reads the title and that field. Put the dialog's instructions in the field's accessible description, or start focus on a button or combo when the whole dialog must be read.
 - Exception: modeless utility windows with special z-order needs (for example AbCS `ImportProgressWindow`) may stay a standard `QDialog` with a Qt parent when `AccessibleDialog` would break their behavior.
 
@@ -141,7 +142,7 @@ See implementation reference section 15.
 Screen reader users benefit from explicit dialog boundaries.
 - Emit dialog start and end accessibility events when feature dialogs open and close.
 - Emit the start event once the dialog is shown, not before.
-- Keep dialog titles short and accurate for Insert+T verification.
+- Keep dialog titles short and accurate for the JAWS/NVDA Insert+T check.
 - Speech of the window behind a dialog, when the dialog closes, is expected. Treat it as a bug only when that speech cuts off a message the user still needs, or when focus goes to the wrong window.
 
 See implementation reference section 16.
@@ -233,7 +234,7 @@ Before marking a UI change done:
 2. Activate the primary action and Cancel/Close with the keyboard only.
 3. Alt+/ reads the latest status after a meaningful action.
 4. Focus returns to a sensible place after each dialog or message box closes.
-5. Insert+T reads the new window's title, and only the new window is spoken when it opens.
+5. The JAWS/NVDA command Insert+T reads the new window's title, and only the new window is spoken when it opens.
 6. A box over a dialog is not preceded by "<title> unavailable".
 7. Tables read cell content, not coordinates or row numbers.
 8. Dialog text reads each line once, with no repeated wrapped lines.

@@ -64,12 +64,12 @@ class InfoDialog(AccessibleDialog):
                 ("body", "Sample Info Dialog - accessibility patterns demo"),
                 ("body", "This dialog is an accessibility root window."),
                 ("heading", "WHAT TO CHECK"),
-                ("item", "Insert+T reads the window title: Sample Info Dialog."),
+                ("item", "The JAWS/NVDA command Insert+T reads the window title: Sample Info Dialog."),
                 ("item", "It should not read the title of the window behind it."),
                 ("item", "Up and Down arrows read this text one line at a time."),
                 ("item", "Test message box opens a box over this dialog."),
                 ("item", "JAWS/NVDA should not say Sample Info Dialog unavailable first."),
-                ("item", "In the message box, Insert+B reads the whole box."),
+                ("item", "In the message box, the JAWS/NVDA command Insert+B reads the dialog."),
                 ("item", "Tab moves to the Test message box and Close buttons."),
                 ("heading", "HOW THIS TEXT IS BUILT"),
                 ("body", "Each heading, line, and list item is its own paragraph."),
@@ -112,7 +112,7 @@ class InfoDialog(AccessibleDialog):
             title="Message Over Dialog",
             text=(
                 "This box is owned by Sample Info Dialog, which stays enabled behind it.\n"
-                "Press Insert+B to read this message again."
+                "Press the JAWS/NVDA command Insert+B to read this dialog again."
             ),
             button_accessibility={
                 QMessageBox.StandardButton.Ok: ("OK", "Close this message and return to the dialog"),
@@ -244,7 +244,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
         apply_tooltip_accessibility(
             self.info_button,
             "Open info dialog",
-            "Open a sample AccessibleDialog for Insert+T testing",
+            "Open a sample dialog. The JAWS/NVDA command Insert+T reads the title",
         )
         self.info_button.clicked.connect(self.on_open_info_dialog)
         button_layout.addWidget(self.info_button)

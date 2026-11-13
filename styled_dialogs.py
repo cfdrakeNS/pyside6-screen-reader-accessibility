@@ -1,7 +1,7 @@
 """
 Styled dialogs for the standalone accessible sample.
 
-Demonstrates AccessibleDialog (Insert+T root window) and message box helpers.
+Demonstrates AccessibleDialog (the JAWS/NVDA Insert+T title command) and message box helpers.
 """
 
 import sys
@@ -52,7 +52,7 @@ def _set_win32_owner(child_hwnd: int, owner_hwnd: int) -> None:
 
 class AccessibleDialog(QDialog):
     """
-    QDialog that is a root in the MSAA/UIA tree so JAWS Insert+T reads this title.
+    QDialog that is a root in the MSAA/UIA tree so the JAWS/NVDA command Insert+T reads this title.
 
     See doc/PySide6_Accessibility_Patterns_and_Implementation_Reference.md section 4.
     """
