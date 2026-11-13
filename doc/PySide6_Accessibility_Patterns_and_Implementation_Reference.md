@@ -107,7 +107,7 @@ Pattern:
 
 Once focus has been in a text field, JAWS and NVDA stop reading a Qt dialog with the JAWS/NVDA command Insert+B. Moving focus back to a button does not help: for the rest of that dialog's life, the command reads only the title and the focused control (JAWS says "paragraph" in the field). Before focus first enters a text field, the command reads the whole dialog.
 
-Tested in the Popup Tests tab (`popup_lab.py`) with JAWS and NVDA on Qt 6.12, November 2026:
+Tested with JAWS and NVDA on Qt 6.12, November 2026, using a test bench of 19 popup variants (demo commit 18fcd0b, `popup_lab.py`):
 
 - **Fails:** a typed date (`QLineEdit`), a `QDateEdit`, an editable combo box, and a read-only `QLineEdit`, whenever focus enters them. Also fails with the field given its own native window (`WA_NativeWindow`), or reported to the screen reader as static text.
 - **No effect:** visible labels before the field, a dialog description, a status bar, the window icon, centering, and dropping the forced first focus.
@@ -116,6 +116,8 @@ Tested in the Popup Tests tab (`popup_lab.py`) with JAWS and NVDA on Qt 6.12, No
 Qt reports every `QDialog` to UI Automation as a dialog (`IsDialog`), whatever it holds. The whole Qt dialog is one native window, so the screen readers appear to treat the window as an edit window once they have tracked text input in it.
 
 For a small dialog that asks for a date, use Year, Month, and Day combo boxes. Typing digits jumps to a value. Because the JAWS/NVDA command Insert+B then reads the dialog, its instructions can go in visible text and Help instead of the field's accessible description.
+
+Reference: `accessibility_patterns.py` (`DateComboFields`), `main.py` (`ReadDateDialog`, opened with Alt+R).
 
 ### Default button and Enter
 
@@ -686,7 +688,7 @@ Pattern:
 - **Prefilled typed field:** select all with `singleShot(0)` so typing replaces it.
 - **Small date dialogs:** use Year, Month, and Day combo boxes instead of a typed or `QDateEdit` field. A text field stops the JAWS/NVDA command Insert+B from reading the dialog (section 5).
 
-Reference: AbCS `src/accessibility/masked_date_fields.py`, `src/ui/book_details.py`, `src/ui/main_window.py` (read date and Recently Added dialogs). Demo: `popup_lab.py` (`_DateCombos`, Popup Tests tab).
+Reference: AbCS `src/accessibility/masked_date_fields.py`, `src/ui/book_details.py`, `src/ui/main_window.py` (read date and Recently Added dialogs). Demo: `accessibility_patterns.py` (`DateComboFields`), `main.py` (`ReadDateDialog`).
 
 ## 33. Read-only and noisy controls
 

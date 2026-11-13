@@ -6,18 +6,17 @@ Demonstrates accessibility patterns documented in doc/PySide6_*.md
 import sys
 from datetime import datetime
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtCore import QDate, Qt, QTimer
+from PySide6.QtGui import QFontMetrics, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
-    QCheckBox,
     QComboBox,
+    QDialog,
     QFormLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QListWidget,
     QMessageBox,
     QPushButton,
     QStatusBar,
@@ -30,6 +29,7 @@ from PySide6.QtWidgets import (
 
 from accessibility_patterns import (
     AccessibilityMixin,
+    DateComboFields,
     PlotLineList,
     announce_dialog_closed,
     announce_dialog_opened,
@@ -46,7 +46,6 @@ from accessibility_patterns import (
     set_accessible_table_rows,
     validate_year_field,
 )
-from popup_lab import POPUP_VARIANTS, exec_popup_variant, set_date_fields_as_plain_text
 from styled_dialogs import AccessibleDialog, exec_shortcuts_dialog, show_styled_message_box
 
 _CONTEXT_HELP = {
@@ -124,6 +123,67 @@ class InfoDialog(AccessibleDialog):
         self.test_button.setFocus()
 
 
+class ReadDateDialog(AccessibleDialog):
+    """Date popup with Year, Month, and Day combo boxes (section 5).
+
+    No text field: once focus has been in one, the JAWS/NVDA command Insert+B
+    stops reading the dialog.
+    """
+
+    def __init__(self, parent, item_name: str, read_date: QDate | None):
+        super().__init__(parent, title=f"Set Read Date for '{item_name}'")
+        self.setModal(True)
+        self.cleared = False
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
+
+        self.date_fields = DateComboFields(self)
+        self.date_fields.setDate(read_date or QDate.currentDate())
+        layout.addWidget(self.date_fields)
+
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        self.ok_button = QPushButton("OK")
+        self.ok_button.setAccessibleName("OK")
+        self.ok_button.setAccessibleDescription("Save the read date")
+        self.ok_button.setDefault(True)
+        self.ok_button.clicked.connect(self.accept)
+        button_layout.addWidget(self.ok_button)
+        self.clear_button = QPushButton("Clear")
+        self.clear_button.setAccessibleName("Clear")
+        self.clear_button.setAccessibleDescription("Remove the read date")
+        self.clear_button.setAutoDefault(False)
+        self.clear_button.clicked.connect(self.on_clear)
+        button_layout.addWidget(self.clear_button)
+        layout.addLayout(button_layout)
+
+        title_width = QFontMetrics(self.font()).horizontalAdvance(self.windowTitle()) + 80
+        self.resize(max(title_width, self.sizeHint().width(), 360), self.sizeHint().height())
+
+    def date(self) -> QDate:
+        return self.date_fields.date()
+
+    def accept(self):
+        chosen = self.date()
+        if chosen > QDate.currentDate():
+            QApplication.beep()
+            show_styled_message_box(
+                self,
+                icon=QMessageBox.Icon.Warning,
+                title="Invalid Entry",
+                text=f"Date {chosen.toString('yyyy-MM-dd')} is in the future. "
+                "Choose today or an earlier date.",
+            )
+            self.date_fields.day.setFocus()
+            return
+        super().accept()
+
+    def on_clear(self):
+        self.cleared = True
+        self.reject()
+
+
 class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
     """Complete accessible window demonstrating documented patterns.
 
@@ -131,11 +191,12 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
     shadowed by Qt's QObject implementation.
     """
 
-    ALLOWED_ALT_KEYS = ("T", "C", "Y", "L", "D", "I", "P", "U")
+    ALLOWED_ALT_KEYS = ("T", "C", "Y", "L", "D", "I", "P", "R")
 
     def __init__(self, parent=None, window_title="Accessible Sample"):
         super().__init__(parent, title=window_title)
         self._window_title = window_title
+        self._read_dates: dict[str, QDate] = {}
         self.setAccessibleDescription("Demonstration window for PySide6 accessibility patterns")
 
         layout = QVBoxLayout(self)
@@ -145,7 +206,6 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
 
         self._build_form_tab()
         self._build_text_tab()
-        self._build_popup_tests_tab()
 
         self.status_bar = QStatusBar()
         self.status_bar.setSizeGripEnabled(False)
@@ -253,12 +313,22 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
         self.info_button.clicked.connect(self.on_open_info_dialog)
         button_layout.addWidget(self.info_button)
 
+        self.read_date_button = QPushButton("Read Date")
+        self.read_date_button.setAccessibleName("Read date")
+        apply_tooltip_accessibility(
+            self.read_date_button,
+            "Set the read date for the selected item",
+            "Set the read date for the selected item - Alt+R",
+        )
+        self.read_date_button.clicked.connect(self.on_read_date)
+        button_layout.addWidget(self.read_date_button)
+
         button_layout.addStretch()
         tab_layout.addLayout(button_layout)
 
         # A form with several buttons: no default button; Enter clicks the
         # focused button (keyPressEvent), so Enter in a field fires nothing.
-        for button in (self.save_button, self.delete_button, self.info_button):
+        for button in (self.save_button, self.delete_button, self.info_button, self.read_date_button):
             button.setAutoDefault(False)
             button.setDefault(False)
 
@@ -268,6 +338,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
         self.setTabOrder(self.items_table, self.save_button)
         self.setTabOrder(self.save_button, self.delete_button)
         self.setTabOrder(self.delete_button, self.info_button)
+        self.setTabOrder(self.info_button, self.read_date_button)
 
         self.tabs.addTab(tab, "Form and Table")
 
@@ -297,66 +368,6 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
         layout.addWidget(self.plot_list)
 
         self.tabs.addTab(tab, "Text Review")
-
-    def _build_popup_tests_tab(self):
-        self.popup_tests_tab = QWidget()
-        layout = QVBoxLayout(self.popup_tests_tab)
-
-        list_label = QLabel("Popup tests:")
-        self.popup_list = QListWidget()
-        self.popup_list.setAccessibleName("Popup tests")
-        self.popup_list.setAccessibleDescription("Test popups for the JAWS/NVDA command Insert+B - Alt+U")
-        for variant in POPUP_VARIANTS:
-            self.popup_list.addItem(variant.heading)
-        self.popup_list.setCurrentRow(0)
-        self.popup_list.itemActivated.connect(lambda _item: self.on_open_popup_test())
-        list_label.setBuddy(self.popup_list)
-        layout.addWidget(list_label)
-        layout.addWidget(self.popup_list)
-
-        self.plain_text_check = QCheckBox("Report date fields as plain text")
-        self.plain_text_check.setAccessibleName("Report date fields as plain text")
-        self.plain_text_check.toggled.connect(self._on_plain_text_toggled)
-        layout.addWidget(self.plain_text_check)
-
-        button_layout = QHBoxLayout()
-        self.open_popup_button = QPushButton("Open")
-        self.open_popup_button.setAccessibleName("Open popup test")
-        apply_tooltip_accessibility(
-            self.open_popup_button,
-            "Open the selected test popup",
-            "Open the popup selected in the Popup tests list",
-        )
-        self.open_popup_button.setAutoDefault(False)
-        self.open_popup_button.setDefault(False)
-        self.open_popup_button.clicked.connect(self.on_open_popup_test)
-        button_layout.addWidget(self.open_popup_button)
-        button_layout.addStretch()
-        layout.addLayout(button_layout)
-
-        self.tabs.addTab(self.popup_tests_tab, "Popup Tests")
-
-    def _on_plain_text_toggled(self, checked: bool):
-        set_date_fields_as_plain_text(checked)
-        self.set_status(
-            "Date fields will be reported as plain text"
-            if checked
-            else "Date fields will be reported as edit fields"
-        )
-
-    def focus_popup_tests(self):
-        self.tabs.setCurrentWidget(self.popup_tests_tab)
-        self.popup_list.setFocus()
-
-    def on_open_popup_test(self):
-        row = self.popup_list.currentRow()
-        if row < 0:
-            self.set_status("Select a popup test first", announce=True)
-            self.popup_list.setFocus()
-            return
-        message = exec_popup_variant(self, POPUP_VARIANTS[row])
-        self.popup_list.setFocus()
-        self.set_status(message, announce=True)
 
     def _on_table_selection_changed(self):
         # Status text only: a focus-pulse announce on every arrow key pulls
@@ -415,6 +426,31 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
         self.set_status("Info dialog closed")
         self.info_button.setFocus()
 
+    def on_read_date(self):
+        row = self.items_table.currentRow()
+        if row < 0:
+            show_styled_message_box(
+                self,
+                icon=QMessageBox.Icon.Warning,
+                title="No Selection",
+                text="Select an item in the table to set its read date.",
+            )
+            self.set_status("Read date canceled: no item selected", announce=True)
+            self.items_table.setFocus()
+            return
+        name = self.items_table.item(row, 0).text()
+        dlg = ReadDateDialog(self, name, self._read_dates.get(name))
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self._read_dates[name] = dlg.date()
+            message = f"Read date set to {dlg.date().toString('yyyy-MM-dd')} for {name}"
+        elif dlg.cleared:
+            self._read_dates.pop(name, None)
+            message = f"Read date cleared for {name}"
+        else:
+            message = f"Read date unchanged for {name}"
+        self.read_date_button.setFocus()
+        self.set_status(message, announce=True)
+
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             focused = self.focusWidget()
@@ -438,7 +474,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
             ("Alt+D", self.on_delete),
             ("Alt+I", self.on_open_info_dialog),
             ("Alt+P", lambda: self.plot_list.setFocus()),
-            ("Alt+U", self.focus_popup_tests),
+            ("Alt+R", self.on_read_date),
         ):
             shortcut = QShortcut(QKeySequence(seq), self)
             shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
@@ -468,8 +504,8 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
                 ("Alt+L", "Jump to list"),
                 ("Alt+D", "Delete selected"),
                 ("Alt+I", "Open info dialog"),
+                ("Alt+R", "Set read date"),
                 ("Alt+P", "Plot"),
-                ("Alt+U", "Popup tests"),
                 ("Alt+Down", "Open category list"),
                 ("Escape", "Close window with confirmation"),
             ],

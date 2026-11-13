@@ -11,7 +11,7 @@ import html as html_module
 import re
 import time
 from collections.abc import Iterable
-from datetime import date, datetime
+from datetime import datetime
 
 try:
     import psutil
@@ -24,9 +24,9 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QComboBox,
-    QDateEdit,
     QDialog,
     QFrame,
+    QHBoxLayout,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -532,134 +532,56 @@ def validate_year_field(field, parent) -> bool:
         return False
 
 
-DATE_DISPLAY = "yyyy-MM-dd"
-DATE_PLACEHOLDER = "yyyy-MM-dd"
-MIN_DATE = QDate(1752, 9, 14)
+class DateComboFields(QWidget):
+    """Year, Month, and Day as three non-editable combo boxes (section 5).
 
-
-def parse_iso_date_text(text: str) -> date | None:
-    """Return a date from yyyy-MM-dd (or yyyyMMdd) text, None when blank, or raise ValueError."""
-    raw = (text or "").strip().replace(" ", "")
-    if not raw:
-        return None
-    if len(raw) == 8 and raw.isdigit():
-        raw = f"{raw[:4]}-{raw[4:6]}-{raw[6:8]}"
-    elif not (len(raw) == 10 and raw[4] == "-" and raw[7] == "-"):
-        raise ValueError("incomplete")
-    try:
-        return datetime.strptime(raw, "%Y-%m-%d").date()
-    except ValueError as exc:
-        raise ValueError("invalid") from exc
-
-
-def date_invalid_message(entered: str, *, allow_blank: bool = True) -> str:
-    shown = (entered or "").strip() or "(blank)"
-    blank_note = ", or leave blank" if allow_blank else ""
-    return f"Date '{shown}' is not valid. Enter a date as year-month-day{blank_note}."
-
-
-def date_future_message(entered: str) -> str:
-    shown = (entered or "").strip() or "(blank)"
-    return f"Date '{shown}' is in the future. Enter today or an earlier date."
-
-
-class MaskedDateEdit(QLineEdit):
-    """Typed yyyy-MM-dd date for screen reader users (section 32).
-
-    A QDateEdit reads one segment at a time and changes the value with Up and
-    Down; a plain text field reads the typed date back as a whole.
+    Use in small dialogs instead of a typed date or QDateEdit: once focus has
+    been in a text field, the JAWS/NVDA command Insert+B stops reading the dialog.
+    Typing digits jumps to a value; Tab moves from Year to Month to Day.
     """
 
-    def __init__(self, parent=None, *, allow_blank: bool = True, disallow_future: bool = True):
+    def __init__(self, parent=None, *, min_year: int = 1950, max_year: int | None = None):
         super().__init__(parent)
-        self._allow_blank = allow_blank
-        self._disallow_future = disallow_future
-        self.setPlaceholderText(DATE_PLACEHOLDER)
-        self.setMaxLength(10)
-        self.setMaximumWidth(150)
-        self.setClearButtonEnabled(False)
-        self.setAccessibleName("Date")
-        blank_note = "or leave blank. " if allow_blank else ""
-        future_note = "Must be today or earlier. " if disallow_future else ""
-        self.setAccessibleDescription(
-            f"Type a date as year dash month dash day, {blank_note}{future_note}"
-            "Invalid values show a message when you confirm."
-        )
+        max_year = QDate.currentDate().year() if max_year is None else max_year
+        self.year = QComboBox(self)
+        self.year.addItems([str(y) for y in range(max_year, min_year - 1, -1)])
+        self.month = QComboBox(self)
+        self.month.addItems([f"{m:02d}" for m in range(1, 13)])
+        self.day = QComboBox(self)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        for combo, name in ((self.year, "Year"), (self.month, "Month"), (self.day, "Day")):
+            combo.setAccessibleName(name)
+            combo.setToolTip(name)
+            layout.addWidget(combo)
+        layout.addStretch()
+        self.setFocusProxy(self.year)
+        self.year.currentIndexChanged.connect(self._refill_days)
+        self.month.currentIndexChanged.connect(self._refill_days)
+        self._refill_days()
 
-    def focusInEvent(self, event):
-        super().focusInEvent(event)
-        QTimer.singleShot(0, self._place_cursor_for_typing)
-
-    def _place_cursor_for_typing(self) -> None:
-        if not self.hasFocus():
-            return
-        self.deselect()
-        self.setCursorPosition(0)
+    def _refill_days(self, *_args) -> None:
+        keep = self.day.currentIndex()
+        days = QDate(int(self.year.currentText()), self.month.currentIndex() + 1, 1).daysInMonth()
+        self.day.blockSignals(True)
+        self.day.clear()
+        self.day.addItems([f"{d:02d}" for d in range(1, days + 1)])
+        self.day.setCurrentIndex(min(max(keep, 0), days - 1))
+        self.day.blockSignals(False)
 
     def setDate(self, qdate: QDate) -> None:
-        self.setText(qdate.toString(DATE_DISPLAY) if qdate and qdate.isValid() else "")
+        if self.year.findText(str(qdate.year())) < 0:
+            return
+        self.year.setCurrentText(str(qdate.year()))
+        self.month.setCurrentIndex(qdate.month() - 1)
+        self.day.setCurrentIndex(qdate.day() - 1)
 
-    def validated_date(self) -> date | None:
-        """Return the date, None when blank and allowed, or raise ValueError."""
-        parsed = parse_iso_date_text(self.text())
-        if parsed is None:
-            if self._allow_blank:
-                return None
-            raise ValueError("blank")
-        if parsed < MIN_DATE.toPython():
-            raise ValueError("invalid")
-        if self._disallow_future and parsed > date.today():
-            raise ValueError("future")
-        return parsed
-
-    def invalid_message(self) -> str:
-        try:
-            self.validated_date()
-        except ValueError as exc:
-            if str(exc) == "future":
-                return date_future_message(self.text())
-        return date_invalid_message(self.text(), allow_blank=self._allow_blank)
-
-
-def configure_classic_date_field(field: QDateEdit, *, disallow_future: bool = True) -> QDateEdit:
-    """Give a QDateEdit a calendar popup (Alt+Down opens it) and the yyyy-MM-dd format."""
-    field.setCalendarPopup(True)
-    field.setDisplayFormat(DATE_DISPLAY)
-    field.setMinimumDate(MIN_DATE)
-    if disallow_future:
-        field.setMaximumDate(QDate.currentDate())
-    return field
-
-
-def make_classic_date_field(parent=None, *, disallow_future: bool = True) -> QDateEdit:
-    """QDateEdit with a calendar popup (Alt+Down opens it)."""
-    return configure_classic_date_field(QDateEdit(parent), disallow_future=disallow_future)
-
-
-def make_date_field(parent=None, *, allow_blank: bool = True, disallow_future: bool = True):
-    """Date field: typed MaskedDateEdit when a screen reader is active, else QDateEdit (section 32)."""
-    if is_screen_reader_active():
-        return MaskedDateEdit(parent, allow_blank=allow_blank, disallow_future=disallow_future)
-    return make_classic_date_field(parent, disallow_future=disallow_future)
-
-
-def validate_date_field(field, parent) -> bool:
-    """Return True when the date is valid; otherwise beep, warn, and focus the field."""
-    if not isinstance(field, MaskedDateEdit):
-        return True
-    try:
-        field.validated_date()
-        return True
-    except ValueError:
-        QApplication.beep()
-        exec_styled_message_box(
-            parent,
-            icon=QMessageBox.Icon.Warning,
-            title="Invalid Entry",
-            text=field.invalid_message(),
+    def date(self) -> QDate:
+        return QDate(
+            int(self.year.currentText()),
+            self.month.currentIndex() + 1,
+            self.day.currentIndex() + 1,
         )
-        field.setFocus()
-        return False
 
 
 def _wrap_at_words(text: str, width: int = _PLOT_LINE_WIDTH) -> list[str]:
