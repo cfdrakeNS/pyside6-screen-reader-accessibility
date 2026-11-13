@@ -23,7 +23,7 @@ Pattern:
 - Announce only while the window is visible. `set_status` ignores `announce=True` when `self.isVisible()` is false (section 23).
 - Keep a default status message for explicit readback, and support **Alt+/** to re-read the current status (`read_status_bar_message`).
 - Announce only meaningful state changes, such as save, delete, or a validation failure. Do not announce on every arrow key (section 21).
-- Keep shortcut hints out of status messages ("Saved", not "Saved. Press Ctrl+S to save again"). Hints belong in accessible descriptions and the F1 list. The one exception is "Press Escape to cancel" while a long operation runs.
+- Keep shortcut hints out of status messages ("Saved", not "Saved. Press Ctrl+S to save again"). Hints belong in accessible descriptions and the F1 list. The one exception is "Press Escape to cancel" or "Esc to close" while a long operation runs. AbCS Find and Recently Added add "Alt+/ read status" to the on-screen status only when a screen reader is running.
 - When focus is restored after the announcement, `announce_status_message` uses the application focus widget, or the window's own focus widget if the window is not active yet (section 24).
 
 Reference: `accessibility_patterns.py` (`announce_status_message`, `read_status_bar_message`, `AccessibilityMixin.set_status`), `main.py` (`AccessibleSampleWindow.on_save`, `on_delete`).
@@ -100,7 +100,8 @@ Pattern:
 - Use `AccessibleDialog` for custom modal dialogs (section 4), not raw `QDialog(parent)`.
 - Use the shared message box helper for prompts (section 18).
 - Set clear dialog titles, text, and explicit button labels. Set accessible names and descriptions on the dialog and every control. Do not clear the dialog's name or description to reduce speech.
-- Return focus to the most relevant control after the dialog closes (section 24).
+- Return focus to the most relevant control after the dialog closes (section 24). After No on an unsaved-changes prompt, that control is the field the user was editing.
+- With focus in a text field, the read-dialog command reads the window title and that field. Put the dialog's instructions in the field's accessible description. Start focus on a button or combo when that command must read the whole dialog. AbCS does this on the read date and Recently Added dialogs.
 
 ### Default button and Enter
 
@@ -209,7 +210,7 @@ Model-backed tables (`QTableView` with a `QAbstractTableModel`) follow the same 
 
 Do not announce the row through the status bar on every arrow key (section 21).
 
-**AbCS production.** The AbCS Statistics table (`statistics_dialog.py`) uses the same label/value text on both cells and the same disabled header. The main book table (`BookTableModel` in `main_window.py`) returns `AccessibleTextRole` for every column.
+**AbCS production.** The AbCS Statistics table (`statistics_dialog.py`) uses the same label/value text on both cells and the same disabled header. The main book table (`BookTableModel` in `main_window.py`) returns `AccessibleTextRole` for every column. Selecting many rows uses one selection range per run of consecutive rows (`rows_to_selection` in `table_selection.py`), not one range per cell.
 
 Reference: `accessibility_patterns.py` (`configure_table`, `set_accessible_table_rows`, `build_accessible_table_style`, `keep_selection_visible_when_inactive`), `main.py` (`AccessibleSampleWindow._build_form_tab`).
 
@@ -272,7 +273,9 @@ layout.addWidget(self.body, stretch=1)
 fit_dialog_width_to_text(self, self.body, height=420)
 ```
 
-**No wrapping.** Keep each block to one short sentence. `fit_dialog_width_to_text()` measures every paragraph with the widget's font (including bold headings and item indents) and widens the dialog so none wraps, capped at 90% of the screen width. Call it after the layout is built.
+**No wrapping.** Keep each block to one short sentence. `fit_dialog_width_to_text()` measures every paragraph with the widget's font (including bold headings and item indents) and widens the dialog so none wraps, capped at 90% of the screen width. Call it after the layout is built. Do not use `QTextDocument.idealWidth()` for this; inside a `QTextEdit` it returns the current wrapped width.
+
+**AbCS production.** `prepare_dialog_prose()` in AbCS `src/accessibility/dialog_prose.py` goes one step further for long text (About, License, Setup): it splits any block that would still pass the screen-width cap at sentence, semicolon, comma, or word boundaries, turns wrapping off, and sizes the dialog. JAWS and NVDA testing confirmed each line is then read once.
 
 ### Solution for plain text: `create_accessible_read_only_text()`
 
@@ -380,6 +383,7 @@ Pattern:
 - Call `announce_dialog_closed(dialog)` after the dialog closes to emit `QAccessible.Event.DialogEnd`.
 - Set a short accessible name on the dialog when a title is provided.
 - Only emit events when `QAccessible.isActive()` is true.
+- Speech of the window behind a dialog, when the dialog closes, is expected. Treat it as a bug only when that speech cuts off a message the user still needs, or when focus goes to the wrong window. If the message must survive the close, store it and announce it after focus is back. AbCS Web Metadata does this with `saved_message`.
 
 Reference: `accessibility_patterns.py` (`announce_dialog_opened`, `announce_dialog_closed`), `main.py` (`InfoDialog.showEvent`, `AccessibleSampleWindow.showEvent`).
 
@@ -413,7 +417,11 @@ A modal `QMessageBox(dialog)` disables the dialog behind it, and JAWS then says 
 3. Centers the box on the owner.
 4. After `exec()` returns, raises and activates the owner. Without a Qt parent, Qt does not reactivate the owner, and the caller's `setFocus()` would land in an inactive window.
 
-A raw `QMessageBox(dialog).exec()` brings the "unavailable" noise back. In JAWS, **Insert+B** reads the whole message box.
+Before the box opens, let the owner finish becoming active. Right after another dialog closes, no window is active yet, or Qt still reports the hidden dialog as active. If the box opens in that gap, the owner becomes active afterward and the screen reader reads the owner instead of the box. When no visible window is active, raise and activate the owner and process events, then open the box. `exec_styled_message_box` does this first, in `_settle_owner_activation` (the same name as in AbCS `src/accessibility/style_helpers.py`). Any other popup or progress window opened at that moment needs the same step.
+
+Escape answers the same as Cancel. When the message has no Cancel, Escape answers the same as No. To show Yes and No only, include Cancel in the standard buttons, set it as the escape button, and hide it, so Escape does not fall through to Yes or No. AbCS passes that hidden button as `escape_only_button`. One Enter closes a validation warning. Escape on that warning does not also open the unsaved-changes prompt. Escape and the window's close box both run the unsaved-changes check.
+
+A raw `QMessageBox(dialog).exec()` brings the "unavailable" noise back. The read-dialog command reads a message box in full. On a dialog whose focus is in a text field, it reads the title and that field (section 5).
 
 Reference: `accessibility_patterns.py` (`exec_styled_message_box`), `styled_dialogs.py` (`show_styled_message_box`), `main.py` (`InfoDialog.on_test_message_box`, `AccessibleSampleWindow.on_save`, `on_delete`, `on_escape`).
 
@@ -470,6 +478,7 @@ Pattern:
 - Set `setTabKeyNavigation(False)`, or replace the table's `keyPressEvent` so **Tab** and **Shift+Tab** move focus to the next/previous widget in the tab chain.
 - Delegate all other keys to the default `QTableWidget.keyPressEvent`.
 - Pair with explicit `setTabOrder` so the exit target is predictable.
+- If Tab would leave the table and the next control is hidden, keep focus on the current cell. Leaving the table with nowhere to land puts focus nowhere. The AbCS main table does this when no footer button is showing.
 
 Reference: `accessibility_patterns.py` (`make_accessible_table_key_press`), `main.py` (`_build_form_tab`).
 
@@ -565,14 +574,26 @@ This demo has no menu bar. **AbCS production:** `_hold_focus_for_menu_action` in
 
 `QAction` menu items use their menu text as the spoken name. Do not call `setAccessibleName` on a `QAction`; Qt does not support it. Give each action clear menu text, and keep decorative icons out of it (section 17).
 
+`QAction` has no `setAccessibleDescription` in PySide6 either. Put the longer explanation in `setStatusTip()`.
+
+**AbCS production menu and toolbar patterns:**
+- **Filters and sort as menus.** Exclusive, checkable menu groups (View menu) replace filter combos above the table. Each item is reachable with the arrow keys and is spoken with its checked state.
+- **Toolbar toggles show real state.** Checkable toolbar buttons are synced with `blockSignals` whenever the filter changes elsewhere, so the screen reader says "pressed" correctly. When a click opens a dialog instead of toggling, the button's state is put back.
+- **Shortcut hints in menu text.** Write `"&Find...\tCtrl+F"` to show the key in the menu without creating a second `QShortcut`, which would cause an ambiguous-shortcut error.
+- **Keys that must work from dialogs** use `Qt.ShortcutContext.ApplicationShortcut` (for example import and zoom reset).
+- **Disabled menu items stay reachable** (section 35).
+- **Qt 6.3:** `QAction.triggered(bool)` always passes `False`; read `isChecked()` instead.
+
+Reference: AbCS `src/ui/main_window.py` (menu builder), `src/accessibility/style_helpers.py` (status tip for actions).
+
 ## 28. Progress windows, modal completion, and worker threads (AbCS production)
 
 Principles from AbCS background work (import, web fetch, Calibre):
-- **Opening a progress window:** show, raise, activate, and focus the progress window **before** disabling the caller's buttons. Disabling the focused button first moves focus to the next control, for example an instructions label, and the screen reader reads it.
+- **Opening a progress window:** show, raise, activate, and focus the progress window **before** disabling the caller's buttons. Disabling the focused button first moves focus to the next control, for example an instructions label, and the screen reader reads it. If a confirm box just closed, let that window finish becoming active before the progress window opens (section 18). The progress window is the next thing spoken.
 - **Modal completion after background work:** `raise_()`, `activateWindow()`, and focus on the **default button** (or the main action button) before announcing.
 - **Worker threads must not touch widgets.** Send progress and UI updates through a GUI-thread `QObject` bridge, connected with `Qt.QueuedConnection` to `@Slot` methods. Plain Python callables are not enough.
 
-This demo has no background work.
+This demo has no background work. Section 39 adds what JAWS and NVDA testing of AbCS confirmed about progress windows.
 
 ## 29. Testing gate (manual JAWS/NVDA smoke)
 
@@ -586,5 +607,205 @@ Before marking a UI change done, test with at least one screen reader, and with 
 6. A confirm or validation box over a dialog is not preceded by "<title> unavailable". Insert+B reads the box.
 7. Arrowing through a table reads cell content, not coordinates or row numbers.
 8. Arrowing through dialog text reads each line once, with no repeated wrapped lines.
+9. Up or Down on a year or date field speaks the new value. Arrowing a table or list does not fire a status announcement for that move.
+10. An unavailable action says why. Escape and the window's close box both run the unsaved-changes check.
 
-The demo exercises every item: `InfoDialog` (Test message box button), the Items table, Save with an empty title or an invalid year, Delete with no row, F1, and Escape.
+The demo exercises items 1–8: `InfoDialog` (Test message box button), the Items table, Save with an empty title or an invalid year, Delete with no row, F1, and Escape. Items 9 and 10 apply to windows with stepped value fields and unsaved-changes prompts (sections 32 and 18).
+
+## Patterns from AbCS production (sections 30–41)
+
+The sections below come from an audit of every accessibility workaround in AbCS (November 2026) and from the JAWS and NVDA retest of AbCS 3.1. They are not in this demo. File names are in the AbCS repository. Use them as patterns; copy the code from AbCS when you need it.
+
+## 30. Re-reading content that changed under focus
+
+Goal: the screen reader reads a field again when its content changes while it has focus.
+
+Problem: when Page Down loads the next record into the same window, focus does not move, so JAWS and NVDA do not read the new title.
+
+Pattern (AbCS Book Details, after paging):
+1. Briefly make the read-only field editable, and clear its accessible name and description.
+2. `clearFocus()`, then `setFocus(Qt.FocusReason.TabFocusReason)`, and put the cursor at the start.
+3. After `max(screen reader delay, 400)` ms, make it read-only again. Check the widget still exists first.
+
+Related:
+- In a read-only viewer that loads a new document (Help), fire `QAccessible` `TextCaretMoved` after loading or jumping, and update the window title and accessible name to the new topic.
+- Names and descriptions that follow state: a Play/Pause button renamed when playback changes; a description shown only in edit mode; error text placed in the description of the errors field; names cleared on labels that are hidden.
+
+Reference: AbCS `src/ui/book_details.py`, `src/ui/help_window.py`, `src/ui/preview_window.py`.
+
+## 31. Focus-out validation and loading guards
+
+Goal: validation on leaving a field never fires because of an announcement, a message box, or code that fills the form.
+
+Problems:
+- A status announcement briefly moves focus to the status bar. A focus-out check sees that as leaving the field.
+- A message box takes focus from the field, so its focus-out check runs again and stacks a second box.
+- Filling fields from code fires change signals that mark the form changed, announce, or validate.
+
+Pattern:
+- Run focus-out checks one event-loop turn later (`QTimer.singleShot(0, ...)`), so Qt reports where focus went. Skip the check if focus is still in the field or its popup (for example a calendar).
+- While an announcement is speaking, pause focus-out checks with a guard. AbCS uses a 2-second token; only the latest token counts, and a Tab that happened during the pause runs its commit when the pause ends.
+- While a message box is open for a field, ignore that field's focus-out. One warning per problem: AbCS 3.1 removed a second year box that used to stack behind the first.
+- While loading a record, set a loading flag and `setUpdatesEnabled(False)`, and `blockSignals` on widgets you change from code. Nothing marks changed, announces, or validates.
+- Ignore the spurious `editTextChanged` an editable combo sends when it gets focus. Act on `activated`, not `currentIndexChanged`, for user choices.
+- Save pending edits on Ctrl+S or when paging to another record, because focus-out never fired.
+
+Reference: AbCS `src/ui/book_details.py`, `src/ui/import_detail_window.py`, `src/ui/update_window.py`.
+
+## 32. Date and stepped-value fields
+
+Goal: date and number fields that speak their value and never show a nonsense date.
+
+Pattern:
+- **Typed fields with a screen reader.** `make_year_field()` and `make_date_field()` return a typed `QLineEdit` (`MaskedYearEdit`, `MaskedDateEdit`) when a screen reader process is running, and a spin box or `QDateEdit` otherwise (section 25). Typed fields accept `yyyyMMdd` without dashes and ignore stray spaces.
+- **Speak each step.** After Up/Down changes a focused year or date, announce the new value ("Year 2024"). This is the exception in section 21.
+- **Alt+Up/Down** steps a classic date field by one day. Handle `ShortcutOverride` as well as `KeyPress`.
+- **Step from blank** goes to today or this year, not the minimum (1752).
+- **Tab leaves a `QDateEdit`** instead of moving between its year, month, and day parts. Override `focusNextPrevChild`.
+- **Blank date.** Store blank as the minimum date and set a **non-empty** `specialValueText` (one space). An empty special value is ignored, and the screen reader reads "1752-09-14". Set it again after changing the maximum date. Add a Clear button, because the keyboard cannot clear a `QDateEdit`.
+- **Validation.** Beep, show a styled warning that quotes what was typed (or "(blank)"), keep the text, and put focus back on the field. Never restore an out-of-range stored value, or the warning repeats on every focus-out. A dialog's OK refuses to close on an invalid date.
+- **Prefilled typed field:** select all with `singleShot(0)` so typing replaces it.
+- **Instructions:** when a small dialog opens on a date field, put its instructions in the field's accessible description (section 5).
+
+Reference: AbCS `src/accessibility/masked_date_fields.py`, `src/ui/book_details.py`, `src/ui/main_window.py` (read date and Recently Added dialogs).
+
+## 33. Read-only and noisy controls
+
+Goal: no control changes its value without the user knowing.
+
+Pattern:
+- **Mouse wheel** is blocked on combos, spin boxes, and sliders inside scrolling forms.
+- **Plain Up/Down** is blocked on every combo, editable or not; Alt+Up/Down opens the list (section 2).
+- **Read-only combo.** `QComboBox` has no read-only mode. Keep it enabled and focusable, block wheel, mouse clicks, Up/Down, Space, F4, and Page Up/Down in an event filter, and add "Read only." to its description.
+- **Display values** use read-only `QLineEdit` fields, which stay in the Tab order and can be reviewed, not `QLabel`.
+- **Keys a field swallows.** When a window uses Page Up/Down for previous and next record, take those keys back from spin, date, and combo fields in an event filter, before the field changes its value.
+- **Escape on an open combo list** closes the list first, not the dialog.
+- **Alt+letter on a combo** focuses it and opens its list.
+
+Reference: AbCS `src/ui/book_details.py`, `src/ui/import_detail_window.py`, `src/ui/preferences_window.py`, `src/ui/help_window.py`.
+
+## 34. View and edit modes, and dynamic Tab order
+
+Goal: Tab reaches exactly the controls the user can see and use.
+
+Pattern:
+- **View and edit stacks.** A read-only field in view mode and a combo in edit mode share one cell in a `QStackedWidget`. Swap the focus proxy with the page. Hidden pages are `NoFocus`, and their signals never mark the form changed.
+- **Rebuild the Tab chain** from visible, enabled widgets whenever visibility changes: mode switch, buttons shown or hidden, and again after an announcement has finished (AbCS waits `max(350, screen reader delay + 50)` ms).
+- **Buttons hidden by mode** are removed from the chain. Their shortcuts only fire while the button is visible, and the window's Alt allowlist and F1 list follow what is visible.
+- **No empty Tab stops.** Scroll areas and their content widgets are `NoFocus`. The main window frame is not a Tab stop; in AbCS before 3.1, Tab past the last footer button went nowhere.
+- **Explicit `setTabOrder`** for whole forms, not only around tables. One Tab goes from a tab page's instructions to its first setting.
+- **Custom order where Qt skips controls.** The AbCS Listen window forces Tab through Rewind and Forward, which Qt and JAWS otherwise skipped, and Left/Right move between the player buttons with wraparound.
+- **`setTabChangesFocus(True)`** on every `QTextEdit`, or Tab is typed into it.
+
+Reference: AbCS `src/ui/book_details.py`, `src/ui/web_metadata.py`, `src/ui/preview_window.py`, `src/ui/main_window.py`.
+
+## 35. Keeping unavailable actions findable
+
+Goal: screen reader users can find every command and learn why it does not work right now.
+
+Pattern:
+- **Disabled menu items stay in the arrow-key list.** A `QProxyStyle` returns 1 for `QStyle.StyleHint.SH_Menu_AllowActiveAndDisabled`, so JAWS and NVDA read them as "unavailable" and the list length does not change. Build the proxy on a fresh style instance (`QStyleFactory.create(name)`), because `QProxyStyle` takes ownership of its base style. Style the highlighted disabled item so sighted users see where the arrow keys are.
+- **Prefer enabled buttons that explain.** A disabled button drops out of the Tab order. Keep it enabled, and when it is pressed, show a message or status that explains what is missing. AbCS Import keeps Scan enabled and reports missing fields in a popup.
+- **A shortcut for an unavailable action says why**, for example "Browse is available in Edit mode."
+- **A disabled button's description gives the reason**, for example "Listen is unavailable while editing. Save or cancel first."
+- **Enter that does nothing says why** (for example on a column that has no action).
+
+Reference: AbCS `src/accessibility/accessible_app_style.py` (`AccessibleAppStyle`), `src/main.py`, `src/ui/book_details.py`, `src/ui/import_window.py`.
+
+## 36. Records, reloads, and large selections
+
+Goal: focus stays on the record the user was working with, and selection stays fast.
+
+Pattern:
+- **Focus a table only with a valid current, selected cell.** Otherwise the screen reader lands on a table with nothing to read.
+- **Keep focus on the same record across reloads and sorts.** Block signals on the view, selection model, and model; turn updates off; remember the record ID; rebuild; restore the current cell by ID; then restore again with a token-guarded `singleShot(0)` in case a later event moved it.
+- **After delete,** focus the next record (or the previous one at the end), and cancel the refresh's own focus restore.
+- **Repaint in place** instead of a full refresh when only a cell's text changed.
+- **Guard programmatic selection** with a flag, so selection handlers do not announce while code selects rows.
+- **Update `AccessibleTextRole` before moving the current cell**, so the screen reader reads the new text for the new row.
+- **Large selections.** Select one range per run of consecutive rows (`rows_to_selection`), not cell by cell. AbCS measured about 130 ms per Shift+Arrow step at 300 rows cell by cell.
+- **Column jumps** (Alt+1 to Alt+7) move the current cell like Left/Right so the highlight follows, without changing the selection.
+- **Selection mode.** While rows are selected, actions that would leave the selection say why ("Selection is active. Escape to cancel selection."). Escape clears the selection first, and says "Selection cleared".
+- **Moving between records inside one dialog.** Page Up/Down loads the previous or next record into the same window and keeps a stable title, instead of closing and reopening (which speaks dialog closed and opened each time).
+- **Copy.** Ctrl+C copies the cell and says "Copied." A context menu with an accessible name opens from the Menu key as well as right-click.
+- **Sort and filter changes** are announced ("Sorted by name, A to Z") and move focus to the first visible row. An empty table says "No rows in the list." instead of taking focus.
+
+Reference: AbCS `src/ui/main_window.py` (`focus_book_by_id`, `jump_to_column`, `_block_if_selecting`), `src/ui/table_selection.py` (`rows_to_selection`), `src/ui/name_list_window.py`, `src/ui/import_detail_window.py`, `src/ui/table_clipboard.py`.
+
+## 37. Find and filter
+
+Goal: searching a list never traps or interrupts the user.
+
+Pattern (AbCS Name List and main window Find):
+- Typing a letter while the list has focus goes to the Find field. Ctrl, Alt, and Meta chords, and modifier keys alone, stay on the list, so Ctrl+C still copies.
+- The live filter updates the status bar quietly while typing; it does not announce on each key.
+- Enter in Find jumps to the best match, focuses the list, and announces the position ("match 1 of 4"). Escape clears the filter and returns to the list. Ctrl+F clears Find and focuses it.
+- No match: beep, announce, show a message box, then put focus back on the table.
+- Help search: the search scope follows where focus was (all topics or the current topic), the search box's accessible name says the scope, results replace the navigation list, F3 and Shift+F3 find next and previous, and Escape clears the search.
+
+Reference: AbCS `src/ui/name_list_window.py`, `src/ui/main_window.py` (Find dialog), `src/ui/help_window.py`.
+
+## 38. Tabbed windows
+
+Goal: tab pages are as easy to move between as windows.
+
+Pattern (AbCS Preferences and Reading History):
+- Give the `QTabWidget` an accessible name and each tab a readable name ("Display Settings").
+- Ctrl+Tab and Ctrl+Shift+Tab switch tabs from anywhere in the window, with wraparound.
+- On a tab change, move focus to that tab's instructions or its table.
+- Each tab may start with a short focusable instruction label (section 11 exception).
+- Alt+letter jumps to a section: switch tab, `ensureWidgetVisible` on the scroll area, and focus the first control.
+
+Reference: AbCS `src/ui/preferences_window.py`, `src/ui/reading_history_window.py`.
+
+## 39. Long operations
+
+Goal: during a scan, import, or fetch, the progress window is what the user hears, and the keys keep working.
+
+Confirmed in the AbCS 3.1 retest:
+- **The progress window is the next thing spoken.** Show, raise, activate, and focus it before disabling the caller's controls (section 28). Import Book List spoke its own window until this order was fixed.
+- **Speak each step once.** Batch web fetch showed each book's line twice (above and below the progress bar) and copied it into the dialog description, so JAWS read it twice and fell behind. Show the line once, keep the status bar only for Alt+/, and do not copy progress text into descriptions.
+- **End on the progress window.** When the work finishes, keep the progress window open with a summary that starts with "Scan complete" or "Import complete", give the progress bar the same spoken name, and let Escape close it. A separate "completed" popup was replaced.
+
+Also in AbCS:
+- **Synchronous loops** (no worker thread): update the progress UI at most every 150 ms (always on the last step) and call `processEvents()`, so Escape and Alt+/ keep working.
+- **Modal owner and modeless progress.** When the owner window is application-modal, forward Escape and Alt+/ from the owner to the progress window.
+- **Cancel** asks first (default No), and the progress window stays open after a cancel with the summary.
+- **While running,** keep focus on the progress bar unless Alt+/ is speaking, and end the status with "Press Escape to cancel".
+- **Announce from `showEvent`.** A Python override of `show()` is skipped when the dialog is opened with `exec()`.
+- **Batch summary.** Escape or the close box asks before discarding fetched results that were not saved.
+
+Reference: AbCS `src/ui/import_window.py`, `src/ui/import_progress_window.py`, `src/ui/book_list_import_window.py`, `src/ui/batch_web_fetch_progress.py`, `src/ui/web_fetch_progress.py` (`FetchStatusLabel`), `src/ui/batch_web_fetch_summary.py`.
+
+## 40. Custom accessible interfaces and media
+
+Goal: a control whose default spoken value is meaningless gets a useful one.
+
+Pattern (AbCS Listen window):
+- **Custom slider interface.** Register a factory with `QAccessible.installFactory()` that returns a `QAccessibleWidget` subclass for the seek slider. Its name reads the position as time ("Play position 1:23 / 10:00"), and its value interface returns nothing, so the screen reader does not also say the seconds.
+- **Events only for user actions.** Send `NameChanged` when the user seeks, never on playback ticks, and only to the focused control. Guard against the loop between the player's position updates and the slider.
+- **A speaking status label.** A label whose text change also sets its accessible name and description and sends `NameChanged` and `DescriptionChanged` (AbCS `FetchStatusLabel`).
+- **Pause media before any prompt,** so the audio does not talk over the screen reader. Alt+F4 and the close box go through the same exit path as Escape.
+- **Slider values** in Preferences are kept in the slider's accessible description ("Current value 150 percent") and snapped to steps.
+
+Reference: AbCS `src/ui/preview_window.py` (`ListenPositionSlider`, `_ListenPositionSliderAccessible`), `src/ui/web_fetch_progress.py`, `src/ui/preferences_window.py`.
+
+## 41. Low vision, window placement, and platform notes
+
+Low vision (AbCS):
+- Focus rings of 2 px `palette(highlight)` on inputs, buttons, spin boxes, sliders, and toolbar toggles; 3 px in high-contrast themes.
+- Checkboxes: a highlight border, filled solid when checked, no check glyph.
+- High-contrast themes; dark mode read from the Windows registry, because Qt's detection was unreliable; a Mid color derived from base and text so gridlines stay visible on dark themes.
+- Zoom and theme each own a marked block of the application stylesheet, so one does not overwrite the other. A widget stylesheet is needed to beat an application-wide `* { font-size }` rule.
+- Do not show errors in red text alone.
+
+Window placement:
+- Keep windows on screen at high zoom (clamp after layout). Open the main window maximized. Center small dialogs. Size a dialog so its full title is visible.
+- A window that must stay above its owner on every show (Listen) calls `SetWindowPos(HWND_TOP)` after setting the Win32 owner.
+- A message needed before `QApplication` exists uses a native Win32 `MessageBoxW` with topmost and foreground flags.
+
+Linux (Fusion):
+- Use a minimal stylesheet. Do not style `::drop-down` or `::down-arrow`, which breaks Fusion painting. Set `QT_LOGGING_RULES` before `QApplication` to hide harmless painter warnings.
+- `AccessibleDialog` has no Linux owner equivalent, so those dialogs are not tied to their owner window there.
+
+Reference: AbCS `src/accessibility/style_helpers.py`, `scaling.py`, `theme_manager.py`, `windows_theme_detector.py`, `linux_qt_compat.py`, `src/main.py`.

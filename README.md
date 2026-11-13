@@ -51,6 +51,7 @@ python main.py
 | 2 | Editable combo anti-noise | `AccessibilityMixin.eventFilter` |
 | 3 | Alt+letter hygiene | `is_unmapped_alt_letter` |
 | 4 | AccessibleDialog (Insert+T reads the right title) | `styled_dialogs.AccessibleDialog` |
+| 5 | Default button only for one main action; Enter clicks the focused button in forms | `InfoDialog`, `AccessibleSampleWindow.keyPressEvent` |
 | 6 | Local F1, Escape, Alt+/ shortcuts; Ctrl+S Save | `AccessibleSampleWindow.setup_shortcuts` |
 | 7 | F1 help as a one-column table dialog | `exec_shortcuts_dialog` |
 | 8 | Focus safety (deselect on FocusIn) | `AccessibilityMixin.focus_deselect` |
@@ -59,14 +60,14 @@ python main.py
 | 12 | Plot line-by-line review | `PlotLineList` |
 | 16 | Dialog open and close events | `announce_dialog_opened`, `announce_dialog_closed` |
 | 17 | Tooltips separate from descriptions | `apply_tooltip_accessibility` |
-| 18 | Message box over a dialog without "unavailable" | `exec_styled_message_box`; `InfoDialog` Test message box |
+| 18 | Message box over a dialog without "unavailable"; a box opened right after a dialog closes is read first | `exec_styled_message_box`; `InfoDialog` Test message box |
 | 21 | No status announce while arrowing a table | `_on_table_selection_changed` |
 | 22 | Tab exits the table | `make_accessible_table_key_press` |
 | 23 | Window open: first focus in `showEvent`, no announce while hidden | `AccessibleSampleWindow.showEvent` |
 | 24 | Focus returns to the field after a message box | `exec_styled_message_box`, `announce_status_message` |
 | 25 | Typed year field when a screen reader is running | `make_year_field`, `validate_year_field` |
 
-Sections 14 and 15 (screen reader detection, QAccessible startup) are in `accessibility_patterns.py`. Sections 26–28 describe AbCS production patterns the demo does not include.
+Sections 14 and 15 (screen reader detection, QAccessible startup) are in `accessibility_patterns.py`. Sections 26–28 and 30–41 describe AbCS production patterns the demo does not include: menus, progress windows, focus-out guards, date fields, dynamic Tab order, findable unavailable commands, keeping the user's place in lists, find and filter, tabbed windows, long operations, custom accessible interfaces, and low vision and platform notes.
 
 ## Shortcuts
 
@@ -84,7 +85,7 @@ Sections 14 and 15 (screen reader detection, QAccessible startup) are in `access
 
 ## Validation
 
-Before changing a pattern, run the manual JAWS/NVDA check in implementation reference section 29: names on Tab, keyboard-only actions, Alt+/, focus after each dialog and message box, Insert+T titles, no "unavailable" before a box, tables read content, and dialog text read once per line.
+Before changing a pattern, run the manual JAWS/NVDA check in implementation reference section 29: names on Tab, keyboard-only actions, Alt+/, focus after each dialog and message box, Insert+T titles, no "unavailable" before a box, tables read content, dialog text read once per line, value fields speak the new value, and Escape runs the same check as the close box.
 
 ## Using as a reference
 

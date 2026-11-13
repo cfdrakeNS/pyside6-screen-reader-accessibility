@@ -19,7 +19,12 @@ Source standard: [AbCS `doc/standards/accessibility_ui_standards.md`](https://gi
 | Window open: constructor state, first focus in `showEvent`, no announce while hidden | 23 | `AccessibleSampleWindow.showEvent`, `InfoDialog.showEvent`, `set_status` visibility check |
 | Menu items that open windows hold focus on the menu bar | 26 | AbCS only |
 | Message boxes over dialogs use `exec_styled_message_box` (no "unavailable") | 18 | `exec_styled_message_box`; `InfoDialog` Test message box button |
-| Show and focus a progress window before disabling the caller's buttons | 28 | AbCS only |
+| A box that opens just after a dialog closes waits until a visible window is active | 18 | `_settle_owner_activation` in `exec_styled_message_box` (same name as AbCS) |
+| Escape answers Cancel, or No when the message has no Cancel. Escape and the close box both run the unsaved-changes check | 18 | AbCS `escape_only_button`. Not in the demo |
+| Instructions for a dialog that opens on a text field live on that field | 5 | AbCS read date and Recently Added. Not in the demo |
+| Tab stays on the current cell when the next control is hidden | 22 | AbCS main table when no footer button is showing |
+| Speech of the window behind a dialog, when the dialog closes, is expected | 16 | Documented. AbCS follows this; Web Metadata stores `saved_message` |
+| Show and focus a progress window before disabling the caller's buttons | 28, 39 | AbCS only |
 | Modal completion: raise, activate, focus default button, then announce | 28 | AbCS only |
 | Worker threads update the UI only through a GUI-thread `QObject` bridge | 28 | AbCS only |
 | Block unmapped Alt+letter; editable combos block plain Up/Down | 2, 3 | `AccessibilityMixin.eventFilter`; `category_combo` |
@@ -32,7 +37,7 @@ Source standard: [AbCS `doc/standards/accessibility_ui_standards.md`](https://gi
 |---|---|---|
 | Buttons use `build_accessible_button_style` with `UIScaler` heights | 10, 19 | AbCS only (demo uses default buttons) |
 | Main-window footer buttons follow `update_selection_ui()` rules | — | AbCS only (app-specific) |
-| Primary action is the default button; Tab reaches it | 5 | `InfoDialog.close_button` |
+| Default button only on a dialog with one clear main action; forms turn defaults off and Enter clicks the focused button | 5 | `InfoDialog.close_button` (default); `AccessibleSampleWindow.keyPressEvent` (form) |
 | Decorative icons only through `apply_decorative_action_icon` | 17 | AbCS only |
 | Combos use `build_accessible_combo_box_style`; anti-noise filter when editable | 2 | Filter in demo; styling AbCS only |
 | Checkboxes use `build_accessible_checkbox_style` | — | AbCS only |
@@ -42,7 +47,7 @@ Source standard: [AbCS `doc/standards/accessibility_ui_standards.md`](https://gi
 
 ## Per-change gate
 
-The AbCS JAWS smoke gate (items 1–6) is IR section 29, items 1–6. IR section 29 adds two items found while testing this demo: tables read content, not coordinates, and dialog text reads each line once.
+The AbCS JAWS smoke gate is IR section 29. Items 1–6 match. Items 7–8 (table content, dialog lines read once) were added from this demo and are now in the AbCS gate. Items 9–10 (a stepped value speaks, and Escape runs the same unsaved-changes check as the close box) come from the November 2026 AbCS retest.
 
 ## Cross-cutting principles
 
@@ -50,19 +55,17 @@ AbCS cross-cutting principles 1–4 (tests, `pytest`, test logic first, tests in
 
 ## Patterns in this reference that the AbCS standard does not list yet
 
-These are in the IR and the demo. AbCS code already follows the first four; the standard does not mention them.
+The November 2026 AbCS standard now includes the items this table used to hold: cell accessible text, no status announce while arrowing a table, dialog prose that does not wrap, the typed year field, and reactivating the owner after a message box.
+
+These remain in the IR and are still not named in the AbCS standard.
 
 | Pattern | IR section | In AbCS code |
 |---|---|---|
-| Every table cell has `AccessibleTextRole` text; row headers disabled and empty | 9 | Yes (`statistics_dialog.py`, `BookTableModel`) |
-| No status announce while arrowing a table | 21 | Yes (main window) |
-| Solid table selection highlight | 9 | Yes (`scaling.py`) |
-| Dialog prose as HTML paragraphs | 11 | Yes (`dialog_prose.py`) |
-| Typed year field when a screen reader is running | 25 | Yes (`masked_date_fields.py`) |
-| Dialog sized so no paragraph wraps | 11 | No |
-| Table selection stays visible when the table loses focus | 9 | No |
-| Owner reactivated after a message box over a dialog | 18 | No |
-| Status announce falls back to the window's focus widget | 24 | No |
+| Solid table selection highlight while the table has focus | 9 | Yes (table stylesheet) |
+| Selection stays the same color after the table loses focus | 9 | No, and not needed: the November 2026 retest found the AbCS row stays highlighted |
+| Status announce falls back to the window's focus widget when the application focus widget is empty | 24 | No, and not needed: the retest found focus returns to the field, because AbCS sets it directly |
+
+IR sections 30–41 describe further AbCS production patterns found in a code audit of every AbCS accessibility workaround: re-reading changed content, focus-out guards, date and stepped-value fields, read-only and noisy controls, dynamic Tab order, findable unavailable commands, records and selections, find and filter, tabbed windows, long operations, custom accessible interfaces, and low vision and platform notes. The AbCS standard covers some of them in its "Confirmed in testing" list; the rest are documented only in the IR. Several AbCS windows do not yet follow the default-button, first-focus, shortcut-hint, and single Alt-beep rules; the AbCS standard lists these as not yet on every window.
 
 ## Shortcut policy: what to copy
 

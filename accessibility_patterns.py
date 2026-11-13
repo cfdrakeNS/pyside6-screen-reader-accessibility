@@ -748,6 +748,23 @@ def announce_selection(
         status_bar.showMessage(message)
 
 
+def _settle_owner_activation(owner) -> None:
+    """Let the owner finish becoming active before a box opens over it (section 18).
+
+    Right after a dialog closes, no window is active yet, or Qt still reports
+    the hidden dialog as active. Without this, the owner becomes active after
+    the box appears, and JAWS and NVDA read the owner window instead of the box.
+    """
+    if owner is None or not owner.isVisible():
+        return
+    active = QApplication.activeWindow()
+    if active is not None and active.isVisible():
+        return
+    owner.raise_()
+    owner.activateWindow()
+    QApplication.processEvents()
+
+
 def exec_styled_message_box(
     parent,
     *,
@@ -762,6 +779,7 @@ def exec_styled_message_box(
     from styled_dialogs import AccessibleDialog, _set_win32_owner
 
     owner = parent.window() if parent is not None else None
+    _settle_owner_activation(owner)
     # A modal box disables the window behind it, and JAWS then reads an
     # AccessibleDialog as "<title> unavailable" before the box. Owning the box
     # natively (no Qt parent, window modal) keeps the dialog enabled.
