@@ -21,7 +21,7 @@ Source standard: [AbCS `doc/standards/accessibility_ui_standards.md`](https://gi
 | Message boxes over dialogs use `exec_styled_message_box` (no "unavailable") | 18 | `exec_styled_message_box`; `InfoDialog` Test message box button |
 | A box that opens just after a dialog closes waits until a visible window is active | 18 | `_settle_owner_activation` in `exec_styled_message_box` (same name as AbCS) |
 | Escape answers Cancel, or No when the message has no Cancel. Escape and the close box both run the unsaved-changes check | 18 | AbCS `escape_only_button`. Not in the demo |
-| Instructions for a dialog that opens on a text field live on that field | 5 | AbCS read date and Recently Added. Not in the demo |
+| A small dialog that must be read whole with Insert+B has no text fields; dates use Year, Month, and Day combo boxes | 5 | `DateComboFields`, `ReadDateDialog` (Alt+R). AbCS read date and Recently Added use `src/accessibility/date_combo_fields.py` |
 | Tab stays on the current cell when the next control is hidden | 22 | AbCS main table when no footer button is showing |
 | Speech of the window behind a dialog, when the dialog closes, is expected | 16 | Documented. AbCS follows this; Web Metadata stores `saved_message` |
 | Show and focus a progress window before disabling the caller's buttons | 28, 39 | AbCS only |
