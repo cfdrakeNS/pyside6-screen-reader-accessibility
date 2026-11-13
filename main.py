@@ -79,8 +79,7 @@ class InfoDialog(AccessibleDialog):
                 ("body", "JAWS/NVDA rereads a wrapped line as you arrow up and down."),
             ],
             "Info text",
-            "Sample information. Use arrow keys to read line by line. "
-            "Press Tab to move to the buttons.",
+            "Sample information",
         )
         layout.addWidget(self.body, stretch=1)
 
@@ -268,7 +267,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
         )
         self.items_table.setAccessibleName("Items")
         self.items_table.setAccessibleDescription(
-            "Table showing item names and values. Each row reads the name and value together."
+            "Item names and values"
         )
         self.items_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.items_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -352,7 +351,7 @@ class AccessibleSampleWindow(AccessibilityMixin, AccessibleDialog):
             "Use arrow keys to move line by line.\n"
             "Press Tab to leave this area.",
             "Pattern help text",
-            "Accessibility pattern description. Use arrow keys to read line by line.",
+            "Accessibility pattern description",
         )
         layout.addWidget(QLabel("Read-only navigable text:"))
         layout.addWidget(help_text)

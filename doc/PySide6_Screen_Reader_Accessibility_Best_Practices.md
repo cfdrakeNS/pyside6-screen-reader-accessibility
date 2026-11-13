@@ -22,6 +22,8 @@ Always define meaningful names and descriptions for important controls, groups, 
 - Description: what this control does or how to use it.
 - Leave the control type out of the name. The screen reader already says "button", "edit", "table", or "tab", so "Save button" is read as "Save button, button". Name a field after its label ("Year", not "Year field").
 - End the description with the control's shortcut, after a dash: "Save changes - Ctrl+S".
+- Leave standard navigation out of descriptions ("Use Up and Down arrows", "Press Tab to move to OK", "Use arrow keys to read line by line"); Help covers it. Keep short hints specific to the control, such as a date format or a value range.
+- Users can turn description speech off (JAWS verbosity, NVDA "Report object descriptions"), so nothing essential may live only in a description.
 - Keep names and descriptions on dialogs too; do not clear them to reduce speech.
 - `QAction` menu items are named by their menu text; do not set an accessible name on them.
 - An image that carries information takes focus and has a spoken name; a decorative image does not take focus.

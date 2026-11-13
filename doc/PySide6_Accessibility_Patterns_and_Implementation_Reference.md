@@ -287,7 +287,7 @@ self.body = create_dialog_html_text(
         ("item", "The JAWS/NVDA command Insert+T reads the window title: Sample Info Dialog."),
     ],
     "Info text",  # short name only, never the full body
-    "Sample information. Use arrow keys to read line by line. Press Tab to move to the buttons.",
+    "Sample information",
 )
 layout.addWidget(self.body, stretch=1)
 # ... add buttons ...
@@ -310,7 +310,7 @@ Both helpers apply the same keyboard review settings (`configure_navigable_text_
 
 ### Rules
 
-- Do not put body text in `setAccessibleName()`. Use a short name and a description that mentions arrow-key review.
+- Do not put body text in `setAccessibleName()`. Use a short name and a short description of the content.
 - **Exception: short instructions.** A focusable instruction label of 1 to 3 sentences may carry its whole text as its accessible name, so the screen reader reads it at once when Tab reaches it. Do not set text interaction flags on it (that switches Qt to line-by-line text reading). Anything longer uses line review.
 - One sentence per block; no paragraph may wrap at the dialog's width. A help viewer whose text cannot fit may wrap, but still keeps one sentence per paragraph.
 - Decorative graphics (for example a splash image) use `Qt.NoFocus`. An image that carries information (for example a cover that may be missing) takes focus and has a spoken name such as "Book cover" or "No cover".

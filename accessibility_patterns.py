@@ -462,7 +462,7 @@ class MaskedYearEdit(QLineEdit):
         self.setClearButtonEnabled(False)
         self.setAccessibleDescription(
             f"Type a four digit year from {min_year} to {max_year}, "
-            "or leave blank. Invalid values show a message when you save."
+            "or leave blank."
         )
 
     def focusInEvent(self, event):
@@ -508,7 +508,7 @@ def make_year_field(parent=None, *, min_year: int | None = None, max_year: int |
     spin.setRange(min_year, max_year)
     spin.setMaximumWidth(110)
     spin.setAccessibleDescription(
-        f"Year from {min_year} to {max_year}. Use Up and Down arrows or type a year."
+        f"Year from {min_year} to {max_year}"
     )
     return spin
 
